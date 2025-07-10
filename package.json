@@ -1,0 +1,24 @@
+﻿{
+  "name": "io.enbug.billing",
+  "version": "1.0.0",
+  "displayName": "Enbug Billing",
+  "description": "This package provides in-app purchase for Unity.",
+  "unity": "2022.3",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jerryhwq/unity-billing.git"
+  },
+  "keywords": [
+    "billing",
+    "in-app purchase",
+    "iap"
+  ],
+  "author": {
+    "name": "huwenqiang",
+    "url": "https://www.huwenqiang.cn/"
+  },
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  }
+}
