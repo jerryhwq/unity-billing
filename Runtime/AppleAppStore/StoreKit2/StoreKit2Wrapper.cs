@@ -1,6 +1,9 @@
+#if UNITY_IOS && !UNITY_EDITOR
+#define USE_APPLE_STOREKIT
+#endif
 using System;
 using System.Collections.Concurrent;
-#if UNITY_IOS && !UNITY_EDITOR
+#if USE_APPLE_STOREKIT
 using System.Runtime.InteropServices;
 #endif
 using AOT;
@@ -11,7 +14,7 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
 {
     public static class StoreKit2Wrapper
     {
-#if UNITY_IOS && !UNITY_EDITOR
+#if USE_APPLE_STOREKIT
         private const string LibName = "__Internal";
 #endif
         private static readonly object Lock = new();
@@ -32,7 +35,7 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
         {
             get
             {
-#if UNITY_IOS && !UNITY_EDITOR
+#if USE_APPLE_STOREKIT
                 return enbug_iap_is_storekit2_supported() == 1;
 #else
                 return false;
@@ -42,7 +45,7 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
 
         static StoreKit2Wrapper()
         {
-#if UNITY_IOS && !UNITY_EDITOR
+#if USE_APPLE_STOREKIT
             enbug_iap_storekit2_set_transaction_updated_callback(OnTransactionUpdated);
 #endif
         }
@@ -57,14 +60,14 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
 
         public static void StartLoop()
         {
-#if UNITY_IOS && !UNITY_EDITOR
+#if USE_APPLE_STOREKIT
             enbug_iap_storekit2_start_loop();
 #endif
         }
 
         public static void RequestProducts(string[] productIdentifiers, Action<Product[]> callback)
         {
-#if UNITY_IOS && !UNITY_EDITOR
+#if USE_APPLE_STOREKIT
             var requestId = GetNextRequestId();
             QueryProductsCallbackDict[requestId] = callback;
             var data = JsonConvert.SerializeObject(productIdentifiers);
@@ -75,7 +78,7 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
         public static void Purchase(string productIdentifier, Product.PurchaseOption option,
             Action<AppleErrorCode?, AppleError, Transaction?> callback)
         {
-#if UNITY_IOS && !UNITY_EDITOR
+#if USE_APPLE_STOREKIT
             var requestId = GetNextRequestId();
             PurchaseCallback[requestId] = callback;
             var optionStr = JsonConvert.SerializeObject(option);
@@ -85,7 +88,7 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
 
         public static void FinishTransaction(ulong id, Action<bool> callback)
         {
-#if UNITY_IOS && !UNITY_EDITOR
+#if USE_APPLE_STOREKIT
             var requestId = GetNextRequestId();
             FinishTransactionCallbackDict[requestId] = callback;
             enbug_iap_storekit2_finish_transaction(requestId, id, OnFinishTransaction);
@@ -94,7 +97,7 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
 
         public static void GetTransactions(Action<Transaction[]> callback)
         {
-#if UNITY_IOS && !UNITY_EDITOR
+#if USE_APPLE_STOREKIT
             var requestId = GetNextRequestId();
             QueryPurchasesCallbackDict[requestId] = callback;
             enbug_iap_storekit2_get_transactions(requestId, OnQueryPurchases);
@@ -184,7 +187,7 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
 
         private delegate void QueryPurchasesDelegate(int requestId, string transactionsJson);
 
-#if UNITY_IOS && !UNITY_EDITOR
+#if USE_APPLE_STOREKIT
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]
         private static extern void enbug_iap_storekit2_start_loop();
 

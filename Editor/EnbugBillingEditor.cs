@@ -5,6 +5,7 @@ using UnityEngine;
 
 namespace Enbug.Billing.Editor
 {
+    [InitializeOnLoad]
     public static class EnbugBillingEditor
     {
         private class LibraryInfo
@@ -45,11 +46,16 @@ namespace Enbug.Billing.Editor
             },
         };
 
+        static EnbugBillingEditor()
+        {
+            var info = CurrentPlatformInfo;
+        }
+
         public static void SetAppStore(AppStore appStore)
         {
             var config = CurrentPlatformInfo;
 
-            if (EditorUserBuildSettings.activeBuildTarget == BuildTarget.iOS)
+            if (EditorUserBuildSettings.activeBuildTarget is BuildTarget.iOS)
             {
                 appStore = AppStore.AppleAppStore;
             }
