@@ -351,7 +351,7 @@ internal class GoogleBillingClientWrapper(
         )
     }
 
-    private fun upgradeSubsSkuInternal(
+    private suspend fun upgradeSubsSkuInternal(
         activity: Activity,
         skuDetails: SkuDetails,
         oldPurchaseToken: String,
@@ -377,10 +377,12 @@ internal class GoogleBillingClientWrapper(
             billingFlowParamsBuilder.setObfuscatedProfileId(obfuscatedProfileId)
         }
 
-        return billingClient.launchBillingFlow(activity, billingFlowParamsBuilder.build())
+        return withContext(Dispatchers.Main) {
+            billingClient.launchBillingFlow(activity, billingFlowParamsBuilder.build())
+        }
     }
 
-    private fun upgradeSubsProductInternal(
+    private suspend fun upgradeSubsProductInternal(
         activity: Activity,
         productDetails: ProductDetails,
         oldPurchaseToken: String,
@@ -419,7 +421,9 @@ internal class GoogleBillingClientWrapper(
             billingFlowParamsBuilder.setObfuscatedProfileId(obfuscatedProfileId)
         }
 
-        return billingClient.launchBillingFlow(activity, billingFlowParamsBuilder.build())
+        return withContext(Dispatchers.Main) {
+            billingClient.launchBillingFlow(activity, billingFlowParamsBuilder.build())
+        }
     }
 
     suspend fun consume(purchaseToken: String): ConsumeResult {
@@ -580,7 +584,7 @@ internal class GoogleBillingClientWrapper(
         }
     }
 
-    private fun buySkuInternal(
+    private suspend fun buySkuInternal(
         activity: Activity,
         skuDetails: SkuDetails,
         options: PurchaseOptions,
@@ -599,10 +603,12 @@ internal class GoogleBillingClientWrapper(
             billingFlowParamsBuilder.setObfuscatedProfileId(obfuscatedProfileId)
         }
 
-        return billingClient.launchBillingFlow(activity, billingFlowParamsBuilder.build())
+        return withContext(Dispatchers.Main) {
+            billingClient.launchBillingFlow(activity, billingFlowParamsBuilder.build())
+        }
     }
 
-    private fun buyInAppProductInternal(
+    private suspend fun buyInAppProductInternal(
         activity: Activity,
         productDetails: ProductDetails,
         options: PurchaseOptions,
@@ -626,10 +632,12 @@ internal class GoogleBillingClientWrapper(
             billingFlowParamsBuilder.setObfuscatedProfileId(obfuscatedProfileId)
         }
 
-        return billingClient.launchBillingFlow(activity, billingFlowParamsBuilder.build())
+        return withContext(Dispatchers.Main) {
+            billingClient.launchBillingFlow(activity, billingFlowParamsBuilder.build())
+        }
     }
 
-    private fun buySubsProductInternal(
+    private suspend fun buySubsProductInternal(
         activity: Activity,
         productDetails: ProductDetails,
         options: PurchaseOptions,
@@ -662,7 +670,9 @@ internal class GoogleBillingClientWrapper(
             billingFlowParamsBuilder.setObfuscatedProfileId(obfuscatedProfileId)
         }
 
-        return billingClient.launchBillingFlow(activity, billingFlowParamsBuilder.build())
+        return withContext(Dispatchers.Main) {
+            billingClient.launchBillingFlow(activity, billingFlowParamsBuilder.build())
+        }
     }
 
     private suspend fun ensureConnection(): BillingResult {
