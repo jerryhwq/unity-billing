@@ -42,7 +42,7 @@ namespace Enbug.Billing.Editor
         {
             [AppStore.GooglePlay] = new LibraryInfo
             {
-                PluginPaths = new[] { "GooglePlayBillingWrapper.androidlib" },
+                PluginPaths = new[] { "enbug-billing-google.androidlib" },
             },
         };
 
