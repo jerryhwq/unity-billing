@@ -44,32 +44,32 @@ namespace Enbug.Billing
             _actionList.Enqueue(() => { _onPurchaseComplete?.Invoke(billingResult, purchase); });
         }
 
-        public void QueryInAppProducts(string[] skus, Action<BillingResult, List<Product>> callback)
+        public void QueryInAppProducts(string[] productIds, Action<BillingResult, List<Product>> callback)
         {
-            _billingClient.QueryInAppProducts(skus,
+            _billingClient.QueryInAppProducts(productIds,
                 (billingResult, products) =>
                 {
                     _actionList.Enqueue(() => { callback?.Invoke(billingResult, products); });
                 });
         }
 
-        public void QuerySubsProducts(string[] skus, Action<BillingResult, List<Product>> callback)
+        public void QuerySubsProducts(string[] productIds, Action<BillingResult, List<Product>> callback)
         {
-            _billingClient.QuerySubsProducts(skus,
+            _billingClient.QuerySubsProducts(productIds,
                 (billingResult, products) =>
                 {
                     _actionList.Enqueue(() => { callback?.Invoke(billingResult, products); });
                 });
         }
 
-        public void BuyInAppProduct(string sku, PurchaseOptions options)
+        public void BuyInAppProduct(string productId, PurchaseOptions options)
         {
-            _billingClient.BuyInAppProduct(sku, options);
+            _billingClient.BuyInAppProduct(productId, options);
         }
 
-        public void BuySubsProduct(string sku, PurchaseOptions options)
+        public void BuySubsProduct(string productId, PurchaseOptions options)
         {
-            _billingClient.BuySubsProduct(sku, options);
+            _billingClient.BuySubsProduct(productId, options);
         }
 
         public void Consume(string purchaseToken, Action<BillingResult> callback)

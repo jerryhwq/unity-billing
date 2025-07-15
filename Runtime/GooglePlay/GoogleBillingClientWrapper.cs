@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Scripting;
@@ -26,30 +26,17 @@ namespace Enbug.Billing.GooglePlay
             _nativeBillingClient.Dispose();
         }
 
-        public void QuerySkuDetails(string skuType, string[] skus,
-            Action<GoogleBillingResult, List<GoogleSkuDetails>> callback)
-        {
-            using var unityClass = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
-            using var unityActivity = unityClass.GetStatic<AndroidJavaObject>("currentActivity");
-            using var javaSkus = new AndroidJavaObject("java.util.ArrayList");
-            foreach (var sku in skus)
-                javaSkus.Call<bool>("add", sku);
-
-            var listener = new SkuDetailsResponseListener(callback);
-            _nativeBillingClient.Call("querySkuDetails", skuType, javaSkus, listener);
-        }
-
-        public void QueryProductDetails(string skuType, string[] skus,
+        public void QueryProductDetails(string productType, string[] productIds,
             Action<GoogleBillingResult, List<GoogleProductDetails>> callback)
         {
             using var unityClass = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
             using var unityActivity = unityClass.GetStatic<AndroidJavaObject>("currentActivity");
-            using var javaSkus = new AndroidJavaObject("java.util.ArrayList");
-            foreach (var sku in skus)
-                javaSkus.Call<bool>("add", sku);
+            using var javaProductList = new AndroidJavaObject("java.util.ArrayList");
+            foreach (var productId in productIds)
+                javaProductList.Call<bool>("add", productId);
 
             var listener = new ProductDetailsResponseListener(callback);
-            _nativeBillingClient.Call("queryProductDetails", skuType, javaSkus, listener);
+            _nativeBillingClient.Call("queryProductDetails", productType, javaProductList, listener);
         }
 
         private AndroidJavaObject ConvertOptions(PurchaseOptions options)
@@ -60,39 +47,21 @@ namespace Enbug.Billing.GooglePlay
             return javaOptions;
         }
 
-        public void BuyInAppSku(string sku, PurchaseOptions options, Action<GoogleBillingResult> callback)
+        public void BuyInAppProduct(string productId, PurchaseOptions options, Action<GoogleBillingResult> callback)
         {
             using var unityClass = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
             using var unityActivity = unityClass.GetStatic<AndroidJavaObject>("currentActivity");
             using var javaOptions = ConvertOptions(options);
-            _nativeBillingClient.Call("buyInAppSku", unityActivity, sku, javaOptions,
+            _nativeBillingClient.Call("buyInAppProduct", unityActivity, productId, javaOptions,
                 new BillingResultListener(callback));
         }
 
-        public void BuyInAppProduct(string sku, PurchaseOptions options, Action<GoogleBillingResult> callback)
+        public void BuySubsProduct(string productId, PurchaseOptions options, Action<GoogleBillingResult> callback)
         {
             using var unityClass = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
             using var unityActivity = unityClass.GetStatic<AndroidJavaObject>("currentActivity");
             using var javaOptions = ConvertOptions(options);
-            _nativeBillingClient.Call("buyInAppProduct", unityActivity, sku, javaOptions,
-                new BillingResultListener(callback));
-        }
-
-        public void BuySubsSku(string sku, PurchaseOptions options, Action<GoogleBillingResult> callback)
-        {
-            using var unityClass = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
-            using var unityActivity = unityClass.GetStatic<AndroidJavaObject>("currentActivity");
-            using var javaOptions = ConvertOptions(options);
-            _nativeBillingClient.Call("buySubsSku", unityActivity, sku, javaOptions,
-                new BillingResultListener(callback));
-        }
-
-        public void BuySubsProduct(string sku, PurchaseOptions options, Action<GoogleBillingResult> callback)
-        {
-            using var unityClass = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
-            using var unityActivity = unityClass.GetStatic<AndroidJavaObject>("currentActivity");
-            using var javaOptions = ConvertOptions(options);
-            _nativeBillingClient.Call("buySubsProduct", unityActivity, sku, javaOptions,
+            _nativeBillingClient.Call("buySubsProduct", unityActivity, productId, javaOptions,
                 new BillingResultListener(callback));
         }
 

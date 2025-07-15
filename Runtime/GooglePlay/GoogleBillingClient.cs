@@ -15,45 +15,13 @@ namespace Enbug.Billing.GooglePlay
             _billingClientWrapper = new GoogleBillingClientWrapper(OnPurchasesUpdated);
         }
 
-        public bool IsBillingSupported => true;
+        public bool IsBillingSupported => _billingClientWrapper.IsProductDetailsSupported;
         public bool IsSubscriptionSupported => _billingClientWrapper.IsSubscriptionSupported;
         public bool IsSubscriptionsUpdateSupported => _billingClientWrapper.IsSubscriptionsUpdateSupported;
 
-        public void QueryInAppProducts(string[] skus, Action<BillingResult, List<Product>> callback)
+        public void QueryInAppProducts(string[] productIds, Action<BillingResult, List<Product>> callback)
         {
-            if (!_billingClientWrapper.IsProductDetailsSupported)
-            {
-                _billingClientWrapper.QuerySkuDetails(GoogleProductType.INAPP, skus,
-                    (billingResult, googleSkuDetailsList) =>
-                    {
-                        var result = ConvertBillingResult(billingResult);
-                        if (result.ResponseCode != BillingResult.OK ||
-                            googleSkuDetailsList == null)
-                        {
-                            callback.Invoke(result, null);
-                            return;
-                        }
-
-                        var products = googleSkuDetailsList
-                            .Select(googleSkuDetails => new Product
-                            {
-                                DisplayPrice = googleSkuDetails.Price,
-                                CurrencyCode = googleSkuDetails.PriceCurrencyCode,
-                                CurrencySymbol = _billingClientWrapper.ConvertCurrencyCodeToSymbol(googleSkuDetails.PriceCurrencyCode),
-                                Price = _billingClientWrapper.ConvertMicrosToDecimal(googleSkuDetails.PriceAmountMicros),
-                                ProductId = googleSkuDetails.Sku,
-                                Title = googleSkuDetails.Title,
-                                Description = googleSkuDetails.Description,
-                                RawObject = googleSkuDetails,
-                            })
-                            .ToList();
-
-                        callback?.Invoke(result, products);
-                    });
-                return;
-            }
-
-            _billingClientWrapper.QueryProductDetails(GoogleProductType.INAPP, skus,
+            _billingClientWrapper.QueryProductDetails(GoogleProductType.INAPP, productIds,
                 (billingResult, googleProductDetailsList) =>
                 {
                     var result = ConvertBillingResult(billingResult);
@@ -81,38 +49,9 @@ namespace Enbug.Billing.GooglePlay
                 });
         }
 
-        public void QuerySubsProducts(string[] skus, Action<BillingResult, List<Product>> callback)
+        public void QuerySubsProducts(string[] productIds, Action<BillingResult, List<Product>> callback)
         {
-            if (!_billingClientWrapper.IsProductDetailsSupported)
-            {
-                _billingClientWrapper.QuerySkuDetails(GoogleProductType.SUBS, skus,
-                    (billingResult, googleSkuDetailsList) =>
-                    {
-                        var result = ConvertBillingResult(billingResult);
-                        if (result.ResponseCode != BillingResult.OK ||
-                            googleSkuDetailsList == null)
-                        {
-                            callback.Invoke(result, null);
-                            return;
-                        }
-
-                        var products = googleSkuDetailsList
-                            .Select(googleSkuDetails => new Product
-                            {
-                                DisplayPrice = googleSkuDetails.Price,
-                                ProductId = googleSkuDetails.Sku,
-                                Title = googleSkuDetails.Title,
-                                Description = googleSkuDetails.Description,
-                                RawObject = googleSkuDetails,
-                            })
-                            .ToList();
-
-                        callback?.Invoke(result, products);
-                    });
-                return;
-            }
-
-            _billingClientWrapper.QueryProductDetails(GoogleProductType.SUBS, skus,
+            _billingClientWrapper.QueryProductDetails(GoogleProductType.SUBS, productIds,
                 (billingResult, googleProductDetailsList) =>
                 {
                     var result = ConvertBillingResult(billingResult);
@@ -153,26 +92,14 @@ namespace Enbug.Billing.GooglePlay
                 });
         }
 
-        public void BuyInAppProduct(string sku, PurchaseOptions options)
+        public void BuyInAppProduct(string productId, PurchaseOptions options)
         {
-            if (!_billingClientWrapper.IsProductDetailsSupported)
-            {
-                _billingClientWrapper.BuyInAppSku(sku, options, OnPurchaseCallback);
-                return;
-            }
-
-            _billingClientWrapper.BuyInAppProduct(sku, options, OnPurchaseCallback);
+            _billingClientWrapper.BuyInAppProduct(productId, options, OnPurchaseCallback);
         }
 
-        public void BuySubsProduct(string sku, PurchaseOptions options)
+        public void BuySubsProduct(string productId, PurchaseOptions options)
         {
-            if (!_billingClientWrapper.IsProductDetailsSupported)
-            {
-                _billingClientWrapper.BuySubsSku(sku, options, OnPurchaseCallback);
-                return;
-            }
-
-            _billingClientWrapper.BuySubsProduct(sku, options, OnPurchaseCallback);
+            _billingClientWrapper.BuySubsProduct(productId, options, OnPurchaseCallback);
         }
 
         public void Consume(string purchaseToken, Action<BillingResult> callback)

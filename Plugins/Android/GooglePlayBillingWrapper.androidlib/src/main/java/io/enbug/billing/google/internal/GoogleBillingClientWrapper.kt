@@ -7,7 +7,6 @@ import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClient.BillingResponseCode
 import com.android.billingclient.api.BillingClient.FeatureType
 import com.android.billingclient.api.BillingClient.ProductType
-import com.android.billingclient.api.BillingClient.SkuType
 import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingFlowParams
 import com.android.billingclient.api.BillingFlowParams.ProductDetailsParams
@@ -22,14 +21,10 @@ import com.android.billingclient.api.PurchasesResult
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
 import com.android.billingclient.api.QueryPurchasesParams
-import com.android.billingclient.api.SkuDetails
-import com.android.billingclient.api.SkuDetailsParams
-import com.android.billingclient.api.SkuDetailsResult
 import com.android.billingclient.api.acknowledgePurchase
 import com.android.billingclient.api.consumePurchase
 import com.android.billingclient.api.queryProductDetails
 import com.android.billingclient.api.queryPurchasesAsync
-import com.android.billingclient.api.querySkuDetails
 import io.enbug.billing.google.PurchaseOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -49,6 +44,7 @@ internal class GoogleBillingClientWrapper(
                     .enableOneTimeProducts()
                     .build()
             )
+            .enableAutoServiceReconnection()
             .setListener(this)
             .build()
 
@@ -67,16 +63,6 @@ internal class GoogleBillingClientWrapper(
 
     private val subsProductDetailsMapInternal = mutableMapOf<String, ProductDetails>()
 
-    val inAppSkuDetailsMap: Map<String, SkuDetails>
-        get() = inAppSkuDetailsMapInternal.toMap()
-
-    private val inAppSkuDetailsMapInternal = mutableMapOf<String, SkuDetails>()
-
-    val subsSkuDetailsMap: Map<String, SkuDetails>
-        get() = subsSkuDetailsMapInternal.toMap()
-
-    private val subsSkuDetailsMapInternal = mutableMapOf<String, SkuDetails>()
-
     val isSubscriptionsUpdateSupported: Boolean
         get() {
             val billingResult = billingClient.isFeatureSupported(FeatureType.SUBSCRIPTIONS_UPDATE)
@@ -94,46 +80,6 @@ internal class GoogleBillingClientWrapper(
             val billingResult = billingClient.isFeatureSupported(FeatureType.PRODUCT_DETAILS)
             return billingResult.responseCode != BillingResponseCode.FEATURE_NOT_SUPPORTED
         }
-
-    suspend fun buyInAppSku(
-        activity: Activity,
-        sku: String,
-        options: PurchaseOptions,
-    ): BillingResult {
-        val connectionBillingResult = ensureConnection()
-        if (connectionBillingResult.responseCode != BillingResponseCode.OK) {
-            return connectionBillingResult
-        }
-
-        if (inAppSkuDetailsMap.containsKey(sku)) {
-            val skuDetails = inAppSkuDetailsMap[sku]!!
-            return buySkuInternal(
-                activity,
-                skuDetails,
-                options,
-            )
-        }
-
-        val skuDetailsResult = querySkuDetailsInternal(listOf(sku), SkuType.INAPP)
-        val billingResult = skuDetailsResult.billingResult
-        val details = skuDetailsResult.skuDetailsList
-        if (billingResult.responseCode != BillingResponseCode.OK) {
-            return billingResult
-        }
-
-        if (details.isNullOrEmpty()) {
-            val billingResult = BillingResult.newBuilder()
-                .setResponseCode(BillingResponseCode.ITEM_UNAVAILABLE)
-                .build()
-            return billingResult
-        }
-
-        return buySkuInternal(
-            activity,
-            details[0],
-            options,
-        )
-    }
 
     suspend fun buyInAppProduct(
         activity: Activity,
@@ -176,42 +122,6 @@ internal class GoogleBillingClientWrapper(
         )
     }
 
-    suspend fun buySubsSku(
-        activity: Activity,
-        sku: String,
-        options: PurchaseOptions,
-    ): BillingResult {
-        val connectionBillingResult = ensureConnection()
-        if (connectionBillingResult.responseCode != BillingResponseCode.OK) {
-            return connectionBillingResult
-        }
-
-        if (subsSkuDetailsMap.containsKey(sku)) {
-            val skuDetails = subsSkuDetailsMap[sku]!!
-            return buySkuInternal(
-                activity,
-                skuDetails,
-                options,
-            )
-        }
-
-        val skuDetailsResult = querySkuDetailsInternal(listOf(sku), SkuType.SUBS)
-        val billingResult = skuDetailsResult.billingResult
-        val details = skuDetailsResult.skuDetailsList
-        if (billingResult.responseCode != BillingResponseCode.OK) {
-            return billingResult
-        }
-
-        if (details.isNullOrEmpty()) {
-            val billingResult = BillingResult.newBuilder()
-                .setResponseCode(BillingResponseCode.ITEM_UNAVAILABLE)
-                .build()
-            return billingResult
-        }
-
-        return buySkuInternal(activity, details[0], options)
-    }
-
     suspend fun buySubsProduct(
         activity: Activity,
         productId: String,
@@ -248,52 +158,6 @@ internal class GoogleBillingClientWrapper(
         return buySubsProductInternal(
             activity,
             details[0],
-            options,
-        )
-    }
-
-    suspend fun upgradeSubsSku(
-        activity: Activity,
-        sku: String,
-        oldPurchaseToken: String,
-        subscriptionReplacementMode: Int,
-        options: PurchaseOptions,
-    ): BillingResult {
-        val connectionBillingResult = ensureConnection()
-        if (connectionBillingResult.responseCode != BillingResponseCode.OK) {
-            return connectionBillingResult
-        }
-
-        if (subsSkuDetailsMapInternal.containsKey(sku)) {
-            val skuDetails = subsSkuDetailsMapInternal[sku]!!
-            return upgradeSubsSkuInternal(
-                activity,
-                skuDetails,
-                oldPurchaseToken,
-                subscriptionReplacementMode,
-                options,
-            )
-        }
-
-        val skuDetailsResult = querySkuDetailsInternal(listOf(sku), SkuType.SUBS)
-        val billingResult = skuDetailsResult.billingResult
-        val details = skuDetailsResult.skuDetailsList
-        if (billingResult.responseCode != BillingResponseCode.OK) {
-            return billingResult
-        }
-
-        if (details.isNullOrEmpty()) {
-            val billingResult = BillingResult.newBuilder()
-                .setResponseCode(BillingResponseCode.ITEM_UNAVAILABLE)
-                .build()
-            return billingResult
-        }
-
-        return upgradeSubsSkuInternal(
-            activity,
-            details[0],
-            oldPurchaseToken,
-            subscriptionReplacementMode,
             options,
         )
     }
@@ -351,37 +215,6 @@ internal class GoogleBillingClientWrapper(
         )
     }
 
-    private suspend fun upgradeSubsSkuInternal(
-        activity: Activity,
-        skuDetails: SkuDetails,
-        oldPurchaseToken: String,
-        subscriptionReplacementMode: Int,
-        options: PurchaseOptions,
-    ): BillingResult {
-        val subscriptionUpdateParams = BillingFlowParams.SubscriptionUpdateParams.newBuilder()
-            .setOldPurchaseToken(oldPurchaseToken)
-            .setSubscriptionReplacementMode(subscriptionReplacementMode)
-            .build()
-
-        val billingFlowParamsBuilder = BillingFlowParams.newBuilder()
-            .setSubscriptionUpdateParams(subscriptionUpdateParams)
-            .setSkuDetails(skuDetails)
-
-        val obfuscatedAccountId = options.obfuscatedAccountId
-        if (obfuscatedAccountId != null) {
-            billingFlowParamsBuilder.setObfuscatedAccountId(obfuscatedAccountId)
-        }
-
-        val obfuscatedProfileId = options.obfuscatedProfileId
-        if (obfuscatedProfileId != null) {
-            billingFlowParamsBuilder.setObfuscatedProfileId(obfuscatedProfileId)
-        }
-
-        return withContext(Dispatchers.Main) {
-            billingClient.launchBillingFlow(activity, billingFlowParamsBuilder.build())
-        }
-    }
-
     private suspend fun upgradeSubsProductInternal(
         activity: Activity,
         productDetails: ProductDetails,
@@ -421,9 +254,7 @@ internal class GoogleBillingClientWrapper(
             billingFlowParamsBuilder.setObfuscatedProfileId(obfuscatedProfileId)
         }
 
-        return withContext(Dispatchers.Main) {
-            billingClient.launchBillingFlow(activity, billingFlowParamsBuilder.build())
-        }
+        return launchBillingFlow(activity, billingFlowParamsBuilder.build())
     }
 
     suspend fun consume(purchaseToken: String): ConsumeResult {
@@ -456,27 +287,6 @@ internal class GoogleBillingClientWrapper(
         }
     }
 
-    suspend fun querySkuDetails(
-        @SkuType skuType: String,
-        skus: List<String>,
-    ): SkuDetailsResult {
-        val connectionBillingResult = ensureConnection()
-        if (connectionBillingResult.responseCode != BillingResponseCode.OK) {
-            return SkuDetailsResult(
-                connectionBillingResult,
-                null,
-            )
-        }
-
-        val skuDetailsResult = querySkuDetailsInternal(skus, skuType)
-        val billingResult = skuDetailsResult.billingResult
-        val skuDetails = skuDetailsResult.skuDetailsList
-        return SkuDetailsResult(
-            billingResult,
-            skuDetails,
-        )
-    }
-
     suspend fun queryProductDetails(
         @ProductType productType: String,
         productIds: List<String>,
@@ -489,43 +299,7 @@ internal class GoogleBillingClientWrapper(
             )
         }
 
-        val productDetailsResult = queryProductDetailsInternal(productIds, productType)
-        val billingResult = productDetailsResult.billingResult
-        val productDetails = productDetailsResult.productDetailsList
-
-        return ProductDetailsResult(
-            billingResult,
-            productDetails,
-        )
-    }
-
-    private suspend fun querySkuDetailsInternal(
-        skus: List<String>,
-        @SkuType skuType: String,
-    ): SkuDetailsResult {
-        val skuDetailsParams = SkuDetailsParams.newBuilder()
-            .setType(skuType)
-            .setSkusList(skus)
-            .build()
-
-        val skuDetailsResult = withContext(Dispatchers.IO) {
-            billingClient.querySkuDetails(skuDetailsParams)
-        }
-
-        val billingResult = skuDetailsResult.billingResult
-        val skuDetailsList = skuDetailsResult.skuDetailsList
-
-        if (billingResult.responseCode == BillingResponseCode.OK) {
-            skuDetailsList?.forEach { skuDetails ->
-                if (skuDetails.type == SkuType.INAPP) {
-                    inAppSkuDetailsMapInternal[skuDetails.sku] = skuDetails
-                } else if (skuDetails.type == SkuType.SUBS) {
-                    subsSkuDetailsMapInternal[skuDetails.sku] = skuDetails
-                }
-            }
-        }
-
-        return skuDetailsResult
+        return queryProductDetailsInternal(productIds, productType)
     }
 
     private suspend fun queryProductDetailsInternal(
@@ -584,30 +358,6 @@ internal class GoogleBillingClientWrapper(
         }
     }
 
-    private suspend fun buySkuInternal(
-        activity: Activity,
-        skuDetails: SkuDetails,
-        options: PurchaseOptions,
-    ): BillingResult {
-        val billingFlowParamsBuilder = BillingFlowParams
-            .newBuilder()
-            .setSkuDetails(skuDetails)
-
-        val obfuscatedAccountId = options.obfuscatedAccountId
-        if (obfuscatedAccountId != null) {
-            billingFlowParamsBuilder.setObfuscatedAccountId(obfuscatedAccountId)
-        }
-
-        val obfuscatedProfileId = options.obfuscatedProfileId
-        if (obfuscatedProfileId != null) {
-            billingFlowParamsBuilder.setObfuscatedProfileId(obfuscatedProfileId)
-        }
-
-        return withContext(Dispatchers.Main) {
-            billingClient.launchBillingFlow(activity, billingFlowParamsBuilder.build())
-        }
-    }
-
     private suspend fun buyInAppProductInternal(
         activity: Activity,
         productDetails: ProductDetails,
@@ -632,9 +382,7 @@ internal class GoogleBillingClientWrapper(
             billingFlowParamsBuilder.setObfuscatedProfileId(obfuscatedProfileId)
         }
 
-        return withContext(Dispatchers.Main) {
-            billingClient.launchBillingFlow(activity, billingFlowParamsBuilder.build())
-        }
+        return launchBillingFlow(activity, billingFlowParamsBuilder.build())
     }
 
     private suspend fun buySubsProductInternal(
@@ -670,8 +418,12 @@ internal class GoogleBillingClientWrapper(
             billingFlowParamsBuilder.setObfuscatedProfileId(obfuscatedProfileId)
         }
 
+        return launchBillingFlow(activity, billingFlowParamsBuilder.build())
+    }
+
+    private suspend fun launchBillingFlow(activity: Activity, params: BillingFlowParams) : BillingResult {
         return withContext(Dispatchers.Main) {
-            billingClient.launchBillingFlow(activity, billingFlowParamsBuilder.build())
+            billingClient.launchBillingFlow(activity, params)
         }
     }
 

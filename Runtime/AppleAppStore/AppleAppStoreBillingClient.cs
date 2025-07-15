@@ -61,11 +61,11 @@ namespace Enbug.Billing.AppleAppStore
             _onPurchaseComplete?.Invoke(result, purchase);
         }
 
-        public void QueryInAppProducts(string[] skus, Action<BillingResult, List<Product>> callback)
+        public void QueryInAppProducts(string[] productIds, Action<BillingResult, List<Product>> callback)
         {
             if (_useStoreKit2)
             {
-                StoreKit2Wrapper.RequestProducts(skus, appleProducts =>
+                StoreKit2Wrapper.RequestProducts(productIds, appleProducts =>
                 {
                     var result = new BillingResult
                     {
@@ -79,7 +79,7 @@ namespace Enbug.Billing.AppleAppStore
             }
             else
             {
-                StoreKit1Wrapper.RequestProducts(skus, productResponse =>
+                StoreKit1Wrapper.RequestProducts(productIds, productResponse =>
                 {
                     var result = new BillingResult
                     {
@@ -94,11 +94,11 @@ namespace Enbug.Billing.AppleAppStore
             }
         }
 
-        public void QuerySubsProducts(string[] skus, Action<BillingResult, List<Product>> callback)
+        public void QuerySubsProducts(string[] productIds, Action<BillingResult, List<Product>> callback)
         {
             if (_useStoreKit2)
             {
-                StoreKit2Wrapper.RequestProducts(skus, appleProducts =>
+                StoreKit2Wrapper.RequestProducts(productIds, appleProducts =>
                 {
                     var result = new BillingResult
                     {
@@ -112,7 +112,7 @@ namespace Enbug.Billing.AppleAppStore
             }
             else
             {
-                StoreKit1Wrapper.RequestProducts(skus, productResponse =>
+                StoreKit1Wrapper.RequestProducts(productIds, productResponse =>
                 {
                     var result = new BillingResult
                     {
@@ -127,7 +127,7 @@ namespace Enbug.Billing.AppleAppStore
             }
         }
 
-        public void BuyInAppProduct(string sku, PurchaseOptions options)
+        public void BuyInAppProduct(string productId, PurchaseOptions options)
         {
             if (_useStoreKit2)
             {
@@ -135,7 +135,7 @@ namespace Enbug.Billing.AppleAppStore
                 {
                     appAccountToken = options.UserIdentifier,
                 };
-                StoreKit2Wrapper.Purchase(sku, option, (code, error, transaction) =>
+                StoreKit2Wrapper.Purchase(productId, option, (code, error, transaction) =>
                 {
                     Purchase purchase = null;
                     var result = new BillingResult();
@@ -166,7 +166,7 @@ namespace Enbug.Billing.AppleAppStore
                 {
                     applicationUsername = options.UserIdentifier,
                 };
-                StoreKit1Wrapper.AddPayment(sku, option, (success, code) =>
+                StoreKit1Wrapper.AddPayment(productId, option, (success, code) =>
                 {
                     if (success)
                         return;
@@ -181,7 +181,7 @@ namespace Enbug.Billing.AppleAppStore
             }
         }
 
-        public void BuySubsProduct(string sku, PurchaseOptions options)
+        public void BuySubsProduct(string productId, PurchaseOptions options)
         {
             if (_useStoreKit2)
             {
@@ -189,7 +189,7 @@ namespace Enbug.Billing.AppleAppStore
                 {
                     appAccountToken = options.UserIdentifier,
                 };
-                StoreKit2Wrapper.Purchase(sku, option, (code, error, transaction) =>
+                StoreKit2Wrapper.Purchase(productId, option, (code, error, transaction) =>
                 {
                     Purchase purchase = null;
                     var result = new BillingResult();
@@ -220,7 +220,7 @@ namespace Enbug.Billing.AppleAppStore
                 {
                     applicationUsername = options.UserIdentifier,
                 };
-                StoreKit1Wrapper.AddPayment(sku, option, (success, code) =>
+                StoreKit1Wrapper.AddPayment(productId, option, (success, code) =>
                 {
                     if (success)
                         return;
