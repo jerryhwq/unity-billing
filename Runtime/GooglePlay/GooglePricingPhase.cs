@@ -1,4 +1,10 @@
+#if UNITY_ANDROID && !UNITY_EDITOR && ENABLE_UNITY_ANDROID_JNI
+#define ENABLE_GOOGLE_PLAY_BILLING
+#endif
+
+#if ENABLE_GOOGLE_PLAY_BILLING
 using UnityEngine;
+#endif
 
 namespace Enbug.Billing.GooglePlay
 {
@@ -11,6 +17,11 @@ namespace Enbug.Billing.GooglePlay
         public string FormattedPrice { get; }
         public string PriceCurrencyCode { get; }
 
+        private GooglePricingPhase()
+        {
+        }
+
+#if ENABLE_GOOGLE_PLAY_BILLING
         public GooglePricingPhase(AndroidJavaObject javaPricingPhase)
         {
             BillingCycleCount = javaPricingPhase.Call<int>("getBillingCycleCount");
@@ -20,5 +31,6 @@ namespace Enbug.Billing.GooglePlay
             FormattedPrice = javaPricingPhase.Call<string>("getFormattedPrice");
             PriceCurrencyCode = javaPricingPhase.Call<string>("getPriceCurrencyCode");
         }
+#endif
     }
 }

@@ -1,5 +1,11 @@
-﻿using System.Collections.Generic;
+﻿#if UNITY_ANDROID && !UNITY_EDITOR && ENABLE_UNITY_ANDROID_JNI
+#define ENABLE_GOOGLE_PLAY_BILLING
+#endif
+
+using System.Collections.Generic;
+#if ENABLE_UNITY_ANDROID_JNI
 using UnityEngine;
+#endif
 
 namespace Enbug.Billing.GooglePlay
 {
@@ -17,6 +23,11 @@ namespace Enbug.Billing.GooglePlay
         public string Signature { get; }
         public List<string> Products { get; }
 
+        private GooglePurchase()
+        {
+        }
+
+#if ENABLE_GOOGLE_PLAY_BILLING
         public GooglePurchase(AndroidJavaObject javaObject)
         {
             PurchaseState = javaObject.Call<int>("getPurchaseState");
@@ -50,5 +61,6 @@ namespace Enbug.Billing.GooglePlay
                 }
             }
         }
+#endif
     }
 }

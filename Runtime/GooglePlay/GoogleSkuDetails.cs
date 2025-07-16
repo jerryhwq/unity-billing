@@ -1,4 +1,10 @@
+#if UNITY_ANDROID && !UNITY_EDITOR && ENABLE_UNITY_ANDROID_JNI
+#define ENABLE_GOOGLE_PLAY_BILLING
+#endif
+
+#if ENABLE_GOOGLE_PLAY_BILLING
 using UnityEngine;
+#endif
 
 namespace Enbug.Billing.GooglePlay
 {
@@ -22,6 +28,11 @@ namespace Enbug.Billing.GooglePlay
         public string Title { get; }
         public string Type { get; }
 
+        private GoogleSkuDetails()
+        {
+        }
+
+#if ENABLE_GOOGLE_PLAY_BILLING
         public GoogleSkuDetails(AndroidJavaObject javaSkuDetails)
         {
             IntroductoryPriceCycles = javaSkuDetails.Call<int>("getIntroductoryPriceCycles");
@@ -42,5 +53,6 @@ namespace Enbug.Billing.GooglePlay
             Title = javaSkuDetails.Call<string>("getTitle");
             Type = javaSkuDetails.Call<string>("getType");
         }
+#endif
     }
 }

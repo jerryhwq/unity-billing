@@ -1,5 +1,11 @@
+#if UNITY_ANDROID && !UNITY_EDITOR && ENABLE_UNITY_ANDROID_JNI
+#define ENABLE_GOOGLE_PLAY_BILLING
+#endif
+
 using System.Collections.Generic;
+#if ENABLE_GOOGLE_PLAY_BILLING
 using UnityEngine;
+#endif
 
 namespace Enbug.Billing.GooglePlay
 {
@@ -11,6 +17,11 @@ namespace Enbug.Billing.GooglePlay
         public string OfferToken { get; }
         public List<string> OfferTags { get; }
 
+        private GoogleSubscriptionOfferDetails()
+        {
+        }
+
+#if ENABLE_GOOGLE_PLAY_BILLING
         public GoogleSubscriptionOfferDetails(AndroidJavaObject javaSubscriptionOfferDetails)
         {
             using var javaPricingPhases = javaSubscriptionOfferDetails.Call<AndroidJavaObject>("getPricingPhases");
@@ -32,5 +43,6 @@ namespace Enbug.Billing.GooglePlay
                 }
             }
         }
+#endif
     }
 }
