@@ -3,33 +3,42 @@
 #endif
 using System;
 using System.Collections.Concurrent;
-#if USE_APPLE_STOREKIT
 using System.Runtime.InteropServices;
-#endif
 using AOT;
 using Newtonsoft.Json;
 using UnityEngine;
 
 namespace Enbug.Billing.AppleAppStore.StoreKit1
 {
-    public class StoreKit1Wrapper
+    public static class StoreKit1Wrapper
     {
-#if USE_APPLE_STOREKIT
+#if UNITY_IOS && !UNITY_EDITOR
         private const string LibName = "__Internal";
 #endif
         public static event Action<SKPaymentTransaction[]> TransactionUpdatedCallback;
         private static readonly ConcurrentDictionary<int, Action<SKProductsResponse>> QueryProductsCallbacks = new();
-        private static readonly ConcurrentDictionary<int, Action<bool, int>> AddPaymentCallbacks = new();
+        private static readonly ConcurrentDictionary<int, Action<bool, long>> AddPaymentCallbacks = new();
         private static string _receipt;
         private static SKPaymentTransaction[] _transactions;
 
         private static readonly object Lock = new();
         private static int _maxId;
 
+        private static AddPaymentDelegate _addPaymentDelegate;
+        private static QueryProductsDelegate _queryProductsDelegate;
+        private static TransactionUpdatedDelegate _transactionUpdatedDelegate;
+        private static GetReceiptDelegate _getReceiptDelegate;
+        private static GetTransactionsDelegate _getTransactionsDelegate;
+
         static StoreKit1Wrapper()
         {
+            _addPaymentDelegate = OnAddPayment;
+            _queryProductsDelegate = OnQueryProducts;
+            _transactionUpdatedDelegate = OnTransactionUpdated;
+            _getReceiptDelegate = OnGetReceipt;
+            _getTransactionsDelegate = OnGetTransaction;
 #if USE_APPLE_STOREKIT
-            enbug_iap_storekit1_start_listener(OnTransactionUpdated);
+            enbug_iap_storekit1_start_listener(_transactionUpdatedDelegate);
 #endif
         }
 
@@ -49,7 +58,7 @@ namespace Enbug.Billing.AppleAppStore.StoreKit1
                 lock (Lock)
                 {
 #if USE_APPLE_STOREKIT
-                    enbug_iap_storekit1_get_receipt(OnGetReceipt);
+                    enbug_iap_storekit1_get_receipt(_getReceiptDelegate);
 #endif
                     receipt = _receipt;
                     _receipt = null;
@@ -67,7 +76,7 @@ namespace Enbug.Billing.AppleAppStore.StoreKit1
                 lock (Lock)
                 {
 #if USE_APPLE_STOREKIT
-                    enbug_iap_storekit1_get_transactions(OnGetTransaction);
+                    enbug_iap_storekit1_get_transactions(_getTransactionsDelegate);
 #endif
                     transactions = _transactions;
                     _transactions = null;
@@ -83,18 +92,18 @@ namespace Enbug.Billing.AppleAppStore.StoreKit1
             var requestId = GetNextRequestId();
             QueryProductsCallbacks[requestId] = callback;
             enbug_iap_storekit1_request_products(requestId, JsonConvert.SerializeObject(productIdentifiers),
-                OnQueryProducts);
+                _queryProductsDelegate);
 #endif
         }
 
         public static void AddPayment(string productIdentifier, PaymentOption options,
-            Action<bool, int> callback)
+            Action<bool, long> callback)
         {
 #if USE_APPLE_STOREKIT
             var requestId = GetNextRequestId();
             AddPaymentCallbacks[requestId] = callback;
             var optionStr = JsonConvert.SerializeObject(options);
-            enbug_iap_storekit1_add_payment(requestId, productIdentifier, optionStr, OnAddPayment);
+            enbug_iap_storekit1_add_payment(requestId, productIdentifier, optionStr, _addPaymentDelegate);
 #endif
         }
 
@@ -108,11 +117,11 @@ namespace Enbug.Billing.AppleAppStore.StoreKit1
         }
 
         [MonoPInvokeCallback(typeof(QueryProductsDelegate))]
-        private static void OnQueryProducts(int requestId, string data)
+        private static void OnQueryProducts(int requestId, IntPtr data)
         {
             try
             {
-                var response = JsonConvert.DeserializeObject<SKProductsResponse>(data);
+                var response = JsonConvert.DeserializeObject<SKProductsResponse>(Marshal.PtrToStringUTF8(data));
                 if (QueryProductsCallbacks.TryRemove(requestId, out var callback))
                     callback?.Invoke(response);
             }
@@ -123,11 +132,11 @@ namespace Enbug.Billing.AppleAppStore.StoreKit1
         }
 
         [MonoPInvokeCallback(typeof(TransactionUpdatedDelegate))]
-        private static void OnTransactionUpdated(string json)
+        private static void OnTransactionUpdated(IntPtr json)
         {
             try
             {
-                var transactions = JsonConvert.DeserializeObject<SKPaymentTransaction[]>(json);
+                var transactions = JsonConvert.DeserializeObject<SKPaymentTransaction[]>(Marshal.PtrToStringUTF8(json));
                 TransactionUpdatedCallback?.Invoke(transactions);
             }
             catch (Exception e)
@@ -137,7 +146,7 @@ namespace Enbug.Billing.AppleAppStore.StoreKit1
         }
 
         [MonoPInvokeCallback(typeof(AddPaymentDelegate))]
-        private static void OnAddPayment(int requestId, int success, int code)
+        private static void OnAddPayment(int requestId, int success, long code)
         {
             try
             {
@@ -151,26 +160,41 @@ namespace Enbug.Billing.AppleAppStore.StoreKit1
         }
 
         [MonoPInvokeCallback(typeof(GetReceiptDelegate))]
-        private static void OnGetReceipt(string receipt)
+        private static void OnGetReceipt(IntPtr receipt)
         {
-            _receipt = receipt;
+            try
+            {
+                _receipt = Marshal.PtrToStringUTF8(receipt);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
         }
 
         [MonoPInvokeCallback(typeof(GetTransactionsDelegate))]
-        private static void OnGetTransaction(string transactionsJson)
+        private static void OnGetTransaction(IntPtr transactionsJson)
         {
-            _transactions = JsonConvert.DeserializeObject<SKPaymentTransaction[]>(transactionsJson);
+            try
+            {
+                _transactions =
+                    JsonConvert.DeserializeObject<SKPaymentTransaction[]>(Marshal.PtrToStringUTF8(transactionsJson));
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
         }
 
-        private delegate void TransactionUpdatedDelegate(string json);
+        private delegate void TransactionUpdatedDelegate(IntPtr json);
 
-        private delegate void QueryProductsDelegate(int requestId, string data);
+        private delegate void QueryProductsDelegate(int requestId, IntPtr data);
 
-        private delegate void AddPaymentDelegate(int requestId, int success, int code);
+        private delegate void AddPaymentDelegate(int requestId, int success, long code);
 
-        private delegate void GetReceiptDelegate(string receipt);
+        private delegate void GetReceiptDelegate(IntPtr receipt);
 
-        private delegate void GetTransactionsDelegate(string transactionsJson);
+        private delegate void GetTransactionsDelegate(IntPtr transactionsJson);
 
 #if USE_APPLE_STOREKIT
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]

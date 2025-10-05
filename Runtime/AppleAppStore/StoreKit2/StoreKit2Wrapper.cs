@@ -3,9 +3,7 @@
 #endif
 using System;
 using System.Collections.Concurrent;
-#if USE_APPLE_STOREKIT
 using System.Runtime.InteropServices;
-#endif
 using AOT;
 using Newtonsoft.Json;
 using UnityEngine;
@@ -19,6 +17,7 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
 #endif
         private static readonly object Lock = new();
         private static int _maxId;
+        private static string _priceStr;
 
         public static event Action<Transaction> TransactionUpdatedCallback;
         private static readonly ConcurrentDictionary<int, Action<Product[]>> QueryProductsCallbackDict = new();
@@ -30,6 +29,13 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
 
         private static readonly ConcurrentDictionary<int, Action<Transaction[]>>
             QueryPurchasesCallbackDict = new();
+
+        private static QueryProductsDelegate _queryProductsDelegate;
+        private static PurchaseDelegate _purchaseDelegate;
+        private static FinishTransactionDelegate _finishTransactionDelegate;
+        private static QueryPurchasesDelegate _queryPurchasesDelegate;
+        private static FormatPriceDelegate _formatPriceDelegate;
+        private static TransactionUpdatedDelegate _transactionUpdatedDelegate;
 
         public static bool IsSupported
         {
@@ -45,8 +51,14 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
 
         static StoreKit2Wrapper()
         {
+            _queryProductsDelegate = OnQueryProducts;
+            _purchaseDelegate = OnPurchase;
+            _finishTransactionDelegate = OnFinishTransaction;
+            _queryPurchasesDelegate = OnQueryPurchases;
+            _formatPriceDelegate = OnFormatPrice;
+            _transactionUpdatedDelegate = OnTransactionUpdated;
 #if USE_APPLE_STOREKIT
-            enbug_iap_storekit2_set_transaction_updated_callback(OnTransactionUpdated);
+            enbug_iap_storekit2_set_transaction_updated_callback(_transactionUpdatedDelegate);
 #endif
         }
 
@@ -71,7 +83,7 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
             var requestId = GetNextRequestId();
             QueryProductsCallbackDict[requestId] = callback;
             var data = JsonConvert.SerializeObject(productIdentifiers);
-            enbug_iap_storekit2_request_products(requestId, data, OnQueryProducts);
+            enbug_iap_storekit2_request_products(requestId, data, _queryProductsDelegate);
 #endif
         }
 
@@ -82,7 +94,7 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
             var requestId = GetNextRequestId();
             PurchaseCallback[requestId] = callback;
             var optionStr = JsonConvert.SerializeObject(option);
-            enbug_iap_storekit2_purchase(requestId, productIdentifier, optionStr, OnPurchase);
+            enbug_iap_storekit2_purchase(requestId, productIdentifier, optionStr, _purchaseDelegate);
 #endif
         }
 
@@ -91,7 +103,7 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
 #if USE_APPLE_STOREKIT
             var requestId = GetNextRequestId();
             FinishTransactionCallbackDict[requestId] = callback;
-            enbug_iap_storekit2_finish_transaction(requestId, id, OnFinishTransaction);
+            enbug_iap_storekit2_finish_transaction(requestId, id, _finishTransactionDelegate);
 #endif
         }
 
@@ -100,16 +112,16 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
 #if USE_APPLE_STOREKIT
             var requestId = GetNextRequestId();
             QueryPurchasesCallbackDict[requestId] = callback;
-            enbug_iap_storekit2_get_transactions(requestId, OnQueryPurchases);
+            enbug_iap_storekit2_get_transactions(requestId, _queryPurchasesDelegate);
 #endif
         }
 
         [MonoPInvokeCallback(typeof(QueryProductsDelegate))]
-        private static void OnQueryProducts(int requestId, string data)
+        private static void OnQueryProducts(int requestId, IntPtr data)
         {
             try
             {
-                var products = JsonConvert.DeserializeObject<Product[]>(data);
+                var products = JsonConvert.DeserializeObject<Product[]>(Marshal.PtrToStringUTF8(data));
                 if (QueryProductsCallbackDict.TryRemove(requestId, out var callback))
                     callback?.Invoke(products);
             }
@@ -120,11 +132,11 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
         }
 
         [MonoPInvokeCallback(typeof(PurchaseDelegate))]
-        private static void OnPurchase(int requestId, string result)
+        private static void OnPurchase(int requestId, IntPtr result)
         {
             try
             {
-                var transaction = JsonConvert.DeserializeObject<PurchaseCallbackData>(result);
+                var transaction = JsonConvert.DeserializeObject<PurchaseCallbackData>(Marshal.PtrToStringUTF8(result));
                 if (PurchaseCallback.TryRemove(requestId, out var callback))
                     callback?.Invoke(transaction.code, transaction.error, transaction.transaction);
             }
@@ -135,11 +147,11 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
         }
 
         [MonoPInvokeCallback(typeof(TransactionUpdatedDelegate))]
-        private static void OnTransactionUpdated(string transactionJson)
+        private static void OnTransactionUpdated(IntPtr transactionJson)
         {
             try
             {
-                var transaction = JsonConvert.DeserializeObject<Transaction>(transactionJson);
+                var transaction = JsonConvert.DeserializeObject<Transaction>(Marshal.PtrToStringUTF8(transactionJson));
                 TransactionUpdatedCallback?.Invoke(transaction);
             }
             catch (Exception e)
@@ -163,11 +175,12 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
         }
 
         [MonoPInvokeCallback(typeof(QueryPurchasesDelegate))]
-        private static void OnQueryPurchases(int requestId, string transactionsJson)
+        private static void OnQueryPurchases(int requestId, IntPtr transactionsJson)
         {
             try
             {
-                var transactions = JsonConvert.DeserializeObject<Transaction[]>(transactionsJson);
+                var transactions =
+                    JsonConvert.DeserializeObject<Transaction[]>(Marshal.PtrToStringUTF8(transactionsJson));
                 if (QueryPurchasesCallbackDict.TryRemove(requestId, out var callback))
                     callback?.Invoke(transactions);
             }
@@ -177,15 +190,30 @@ namespace Enbug.Billing.AppleAppStore.StoreKit2
             }
         }
 
-        private delegate void PurchaseDelegate(int requestId, string result);
+        [MonoPInvokeCallback(typeof(FormatPriceDelegate))]
+        private static void OnFormatPrice(IntPtr priceStr)
+        {
+            try
+            {
+                _priceStr = Marshal.PtrToStringUTF8(priceStr);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+        }
 
-        private delegate void TransactionUpdatedDelegate(string transactionJson);
+        private delegate void PurchaseDelegate(int requestId, IntPtr result);
 
-        private delegate void QueryProductsDelegate(int requestId, string data);
+        private delegate void TransactionUpdatedDelegate(IntPtr transactionJson);
+
+        private delegate void QueryProductsDelegate(int requestId, IntPtr data);
 
         private delegate void FinishTransactionDelegate(int requestId, int code);
 
-        private delegate void QueryPurchasesDelegate(int requestId, string transactionsJson);
+        private delegate void QueryPurchasesDelegate(int requestId, IntPtr transactionsJson);
+
+        private delegate void FormatPriceDelegate(IntPtr priceStr);
 
 #if USE_APPLE_STOREKIT
         [DllImport(LibName, CallingConvention = CallingConvention.Cdecl)]

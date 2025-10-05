@@ -19,7 +19,7 @@ private func getCurrencySymbol(currencyCode: String) -> String {
 }
 
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, visionOS 1.0, *)
-private func convert(offerType: Transaction.OfferType) -> Int {
+private func convert(offerType: Transaction.OfferType) -> Int32 {
     switch offerType {
     case .introductory:
         return 0
@@ -50,7 +50,7 @@ private func convert(offer: Transaction.Offer) -> [String: Any] {
 }
 
 @available(iOS 16.0, macOS 13.0, tvOS 16.0, watchOS 9.0, visionOS 1.0, *)
-private func convert(environment: AppStore.Environment) -> Int {
+private func convert(environment: AppStore.Environment) -> Int32 {
     switch environment {
     case .production:
         return 0
@@ -64,7 +64,7 @@ private func convert(environment: AppStore.Environment) -> Int {
 }
 
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, visionOS 1.0, *)
-private func convert(environment: String) -> Int {
+private func convert(environment: String) -> Int32 {
     switch environment {
     case "Production":
         return 0
@@ -78,7 +78,7 @@ private func convert(environment: String) -> Int {
 }
 
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, visionOS 1.0, *)
-private func convert(ownershipType: Transaction.OwnershipType) -> Int {
+private func convert(ownershipType: Transaction.OwnershipType) -> Int32 {
     switch ownershipType {
     case .purchased:
         return 0
@@ -90,7 +90,7 @@ private func convert(ownershipType: Transaction.OwnershipType) -> Int {
 }
 
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, visionOS 1.0, *)
-private func convert(revocationReason: Transaction.RevocationReason) -> Int {
+private func convert(revocationReason: Transaction.RevocationReason) -> Int32 {
     switch revocationReason {
     case .developerIssue:
         return 0
@@ -102,7 +102,7 @@ private func convert(revocationReason: Transaction.RevocationReason) -> Int {
 }
 
 @available(iOS 17.0, macOS 14.0, tvOS 17.0, watchOS 10.0, *)
-private func convert(reason: Transaction.Reason) -> Int {
+private func convert(reason: Transaction.Reason) -> Int32 {
     switch reason {
     case .purchase:
         return 0
@@ -114,7 +114,7 @@ private func convert(reason: Transaction.Reason) -> Int {
 }
 
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, visionOS 1.0, *)
-private func convert(reason: String) -> Int {
+private func convert(reason: String) -> Int32 {
     switch reason {
     case "PURCHASE":
         return 0
@@ -126,7 +126,7 @@ private func convert(reason: String) -> Int {
 }
 
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, visionOS 1.0, *)
-private func convert(unit: Product.SubscriptionPeriod.Unit) -> Int {
+private func convert(unit: Product.SubscriptionPeriod.Unit) -> Int32 {
     switch unit {
     case .day:
         return 0
@@ -258,7 +258,7 @@ private func convert(subscriptionPeriod: Product.SubscriptionPeriod) -> [String:
 }
 
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, visionOS 1.0, *)
-private func convert(offerType: Product.SubscriptionOffer.OfferType) -> Int {
+private func convert(offerType: Product.SubscriptionOffer.OfferType) -> Int32 {
     if offerType == .introductory {
         return 0
     }
@@ -277,7 +277,7 @@ private func convert(offerType: Product.SubscriptionOffer.OfferType) -> Int {
 }
 
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, visionOS 1.0, *)
-private func convert(paymentMode: Product.SubscriptionOffer.PaymentMode) -> Int {
+private func convert(paymentMode: Product.SubscriptionOffer.PaymentMode) -> Int32 {
     switch paymentMode {
     case .payAsYouGo:
         return 0
@@ -331,7 +331,7 @@ private func convert(subscriptionInfo: Product.SubscriptionInfo) async -> [Strin
 }
 
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, visionOS 1.0, *)
-private func convert(productType: Product.ProductType) -> Int {
+private func convert(productType: Product.ProductType) -> Int32 {
     switch productType {
     case .consumable:
         return 0
@@ -441,8 +441,10 @@ func mainLoop() {
                 do {
                     let jsonData = try JSONSerialization.data(withJSONObject: transactionDict)
                     let jsonStr = String(data: jsonData, encoding: .utf8)!
-                    jsonStr.withCString { cString in
-                        transactionUpudated?(cString)
+                    await MainActor.run {
+                        jsonStr.withCString { cString in
+                            transactionUpudated?(cString)
+                        }
                     }
                 } catch {
                     print("[Enbug][Billing] error:\(error)")
@@ -456,7 +458,7 @@ func mainLoop() {
 
 @_cdecl("enbug_iap_storekit2_request_products")
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, visionOS 1.0, *)
-func storeKit2RequestProducts(requestId: Int, productIdentifiers: UnsafePointer<CChar>, callback: @Sendable @convention(c) (Int, UnsafePointer<CChar>) -> Void) -> Int {
+func storeKit2RequestProducts(requestId: Int32, productIdentifiers: UnsafePointer<CChar>, callback: @Sendable @convention(c) (Int32, UnsafePointer<CChar>) -> Void) -> Int32 {
     do {
         let productIdentifierStr = String(cString: productIdentifiers)
         let productIdentifierData = productIdentifierStr.data(using: .utf8)!
@@ -472,8 +474,10 @@ func storeKit2RequestProducts(requestId: Int, productIdentifiers: UnsafePointer<
             do {
                 let jsonData = try JSONSerialization.data(withJSONObject: productList)
                 let jsonStr = String(data: jsonData, encoding: .utf8)!
-                jsonStr.withCString { cString in
-                    callback(requestId, cString)
+                await MainActor.run {
+                    jsonStr.withCString { cString in
+                        callback(requestId, cString)
+                    }
                 }
             } catch {
                print("[Enbug][Billing] error:\(error)")
@@ -489,7 +493,7 @@ func storeKit2RequestProducts(requestId: Int, productIdentifiers: UnsafePointer<
 
 @_cdecl("enbug_iap_storekit2_purchase")
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, visionOS 1.0, *)
-func storeKit2Purchase(requestId: Int, productIdentifier: UnsafePointer<CChar>, options: UnsafePointer<CChar>, callback: @Sendable @convention(c) (Int, UnsafePointer<CChar>) -> Void) {
+func storeKit2Purchase(requestId: Int32, productIdentifier: UnsafePointer<CChar>, options: UnsafePointer<CChar>, callback: @Sendable @convention(c) (Int32, UnsafePointer<CChar>) -> Void) {
     let str = String(cString: productIdentifier)
     var appAccountToken: UUID? = nil
     if let data = String(cString: options).data(using: .utf8) {
@@ -518,8 +522,10 @@ func storeKit2Purchase(requestId: Int, productIdentifier: UnsafePointer<CChar>, 
         do {
             let jsonData = try JSONSerialization.data(withJSONObject: dict)
             let jsonStr = String(data: jsonData, encoding: .utf8)!
-            jsonStr.withCString { cString in
-                callback(requestId, cString)
+            await MainActor.run {
+                jsonStr.withCString { cString in
+                    callback(requestId, cString)
+                }
             }
         } catch {
             print("[Enbug][Billing] error:\(error)")
@@ -529,22 +535,26 @@ func storeKit2Purchase(requestId: Int, productIdentifier: UnsafePointer<CChar>, 
 
 @_cdecl("enbug_iap_storekit2_finish_transaction")
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, visionOS 1.0, *)
-func storeKit2FinishTransaction(requestId: Int, identifier: UInt64, callback: @Sendable @convention(c) (Int, Int) -> Void) -> Int {
+func storeKit2FinishTransaction(requestId: Int32, identifier: UInt64, callback: @Sendable @convention(c) (Int32, Int32) -> Void) -> Int32 {
     Task.detached {
         for await verificationResult in Transaction.unfinished {
             switch verificationResult {
             case .verified(let transation):
                 if transation.id == identifier {
                     await transation.finish()
-                    callback(requestId, 1)
+                    await MainActor.run {
+                        callback(requestId, 1)
+                    }
                     return
                 }
             default:
                 break
             }
         }
-
-        callback(requestId, 0)
+        
+        await MainActor.run {
+            callback(requestId, 0)
+        }
     }
 
     return 1
@@ -552,7 +562,7 @@ func storeKit2FinishTransaction(requestId: Int, identifier: UInt64, callback: @S
 
 @_cdecl("enbug_iap_storekit2_get_transactions")
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, visionOS 1.0, *)
-func storeKit2GetTransactions(requestId: Int, callback: @Sendable @convention(c) (Int, UnsafePointer<CChar>?) -> Void) {
+func storeKit2GetTransactions(requestId: Int32, callback: @Sendable @convention(c) (Int32, UnsafePointer<CChar>?) -> Void) {
     Task.detached {
         var transactions: [[String: Any]] = []
         for await verificationResult in Transaction.unfinished {
@@ -567,8 +577,10 @@ func storeKit2GetTransactions(requestId: Int, callback: @Sendable @convention(c)
         do {
             let jsonData = try JSONSerialization.data(withJSONObject: transactions)
             let jsonStr = String(data: jsonData, encoding: .utf8)!
-            jsonStr.withCString { cString in
-                callback(requestId, cString)
+            await MainActor.run {
+                jsonStr.withCString { cString in
+                    callback(requestId, cString)
+                }
             }
         } catch {
             print("[Enbug][Billing] error:\(error)")

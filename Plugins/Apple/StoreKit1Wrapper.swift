@@ -4,7 +4,7 @@ import StoreKit
 @available(iOS, introduced: 3.0, deprecated: 15.0, message: "Use StoreKit 2")
 private enum PaymentResult {
     case code(SKError.Code)
-    case transations([SKPaymentTransaction])
+    case transactions([SKPaymentTransaction])
 }
 
 @available(iOS, introduced: 3.0, deprecated: 15.0, message: "Use StoreKit 2")
@@ -55,7 +55,7 @@ private func convert(price: NSDecimalNumber, locale: Locale) -> String {
     let formatter = NumberFormatter()
     formatter.numberStyle = .currency
     formatter.locale = locale
-    formatter.formatterBehavior = .behavior10_4
+    formatter.formatterBehavior = .default
     return formatter.string(from: price) ?? ""
 }
 
@@ -204,14 +204,16 @@ func storeKit1StartListener(callback: @Sendable @convention(c) (UnsafePointer<CC
             return
         }
 
-        manager = IAPManager { transations in
-            let transationList = transations.map { convert(transaction: $0) }
+        manager = IAPManager { transactions in
+            let transationList = transactions.map { convert(transaction: $0) }
 
             do {
                 let jsonData = try JSONSerialization.data(withJSONObject: transationList)
                 let jsonStr = String(data: jsonData, encoding: .utf8)!
-                jsonStr.withCString { cString in
-                    callback(cString)
+                DispatchQueue.main.async {
+                    jsonStr.withCString { cString in
+                        callback(cString)
+                    }
                 }
             } catch {
                 print("[Enbug][Billing] error:\(error)")
@@ -221,7 +223,7 @@ func storeKit1StartListener(callback: @Sendable @convention(c) (UnsafePointer<CC
 }
 
 @_cdecl("enbug_iap_storekit1_request_products")
-func storeKit1RequestProducts(requestId: Int, productIdentifiers: UnsafePointer<CChar>, callback: @Sendable @convention(c) (Int, UnsafePointer<CChar>?) -> Void) -> Int {
+func storeKit1RequestProducts(requestId: Int32, productIdentifiers: UnsafePointer<CChar>, callback: @Sendable @convention(c) (Int32, UnsafePointer<CChar>?) -> Void) -> Int32 {
     do {
         let productIdentifierStr = String(cString: productIdentifiers)
         let productIdentifierData = productIdentifierStr.data(using: .utf8)!
@@ -238,8 +240,10 @@ func storeKit1RequestProducts(requestId: Int, productIdentifiers: UnsafePointer<
                 do {
                     let jsonData = try JSONSerialization.data(withJSONObject: dict)
                     let jsonStr = String(data: jsonData, encoding: .utf8)!
-                    jsonStr.withCString { cString in
-                        callback(requestId, cString)
+                    DispatchQueue.main.async {
+                        jsonStr.withCString { cString in
+                            callback(requestId, cString)
+                        }
                     }
                 } catch {
                    print("[Enbug][Billing] error:\(error)")
@@ -256,7 +260,7 @@ func storeKit1RequestProducts(requestId: Int, productIdentifiers: UnsafePointer<
 }
 
 @_cdecl("enbug_iap_storekit1_add_payment")
-func storeKit1AddPayment(requestId: Int, productIdentifier: UnsafePointer<CChar>, options: UnsafePointer<CChar>, callback: @Sendable @convention(c) (Int, Int, Int) -> Void) {
+func storeKit1AddPayment(requestId: Int32, productIdentifier: UnsafePointer<CChar>, options: UnsafePointer<CChar>, callback: @Sendable @convention(c) (Int32, Int32, Int64) -> Void) {
     let str = String(cString: productIdentifier)
 
     var applicationUsername: UUID? = nil
@@ -270,17 +274,19 @@ func storeKit1AddPayment(requestId: Int, productIdentifier: UnsafePointer<CChar>
 
     DispatchQueue.main.async {
         addPayment(str, applicationUsername: applicationUsername) { code in
-            if let code = code {
-                callback(requestId, 0, code.rawValue)
-            } else {
-                callback(requestId, 1, 0)
+            DispatchQueue.main.async {
+                if let code = code {
+                    callback(requestId, 0, Int64(code.rawValue))
+                } else {
+                    callback(requestId, 1, 0)
+                }
             }
         }
     }
 }
 
 @_cdecl("enbug_iap_storekit1_finish_transaction")
-func storeKit1FinishTransaction(identifier: UnsafePointer<CChar>) -> Int {
+func storeKit1FinishTransaction(identifier: UnsafePointer<CChar>) -> Int32 {
     let identifierStr = String(cString: identifier)
 
     let transactions = SKPaymentQueue.default().transactions
