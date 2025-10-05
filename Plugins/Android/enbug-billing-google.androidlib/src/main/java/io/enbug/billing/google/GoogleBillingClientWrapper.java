@@ -5,6 +5,7 @@ import android.content.Context;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.util.Consumer;
 
 import com.android.billingclient.api.AcknowledgePurchaseParams;
 import com.android.billingclient.api.AcknowledgePurchaseResponseListener;
@@ -28,17 +29,32 @@ import java.util.ArrayList;
 import java.util.List;
 
 class GoogleBillingClientWrapper implements PurchasesUpdatedListener {
-    private interface ConnectionListener {
-        void invoke(BillingResult result);
-    }
-
     @NonNull
     private final PurchasesUpdatedListener purchasesUpdatedListener;
     @NonNull
     private final BillingClient billingClient;
-    private final List<ConnectionListener> connectionListeners = new ArrayList<>();
+    private final List<Consumer<BillingResult>> connectionListeners = new ArrayList<>();
     private boolean connected;
     private boolean connecting;
+
+    private final BillingClientStateListener clientStateListener = new BillingClientStateListener() {
+        @Override
+        public void onBillingServiceDisconnected() {
+            Helper.getBackgroundHandler().post(() -> connected = false);
+        }
+
+        @Override
+        public void onBillingSetupFinished(@NonNull BillingResult billingResult) {
+            Helper.getBackgroundHandler().post(() -> {
+                connecting = false;
+                connected = billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK;
+                for (Consumer<BillingResult> listener : connectionListeners) {
+                    listener.accept(billingResult);
+                }
+                connectionListeners.clear();
+            });
+        }
+    };
 
     public boolean isProductDetailsSupported() {
         BillingResult billingResult = billingClient.isFeatureSupported(BillingClient.FeatureType.PRODUCT_DETAILS);
@@ -77,10 +93,10 @@ class GoogleBillingClientWrapper implements PurchasesUpdatedListener {
         });
     }
 
-    public void buyInAppProducts(@NonNull Activity activity, @NonNull String productId, @NonNull PurchaseOptions options, @NonNull BillingResultListener callback) {
+    public void buyInAppProducts(@NonNull Activity activity, @NonNull String productId, @NonNull PurchaseOptions options, @NonNull Consumer<BillingResult> callback) {
         ensureConnection(result -> {
             if (result.getResponseCode() != BillingClient.BillingResponseCode.OK) {
-                callback.invoke(result);
+                callback.accept(result);
                 return;
             }
 
@@ -88,13 +104,13 @@ class GoogleBillingClientWrapper implements PurchasesUpdatedListener {
             productIds.add(productId);
             queryProductDetailsInternal(productIds, BillingClient.ProductType.INAPP, (queryBillingResult, queryProductDetailsResult) -> {
                 if (queryBillingResult.getResponseCode() != BillingClient.BillingResponseCode.OK) {
-                    callback.invoke(queryBillingResult);
+                    callback.accept(queryBillingResult);
                     return;
                 }
 
                 List<ProductDetails> productDetailsList = queryProductDetailsResult.getProductDetailsList();
                 if (productDetailsList.isEmpty()) {
-                    callback.invoke(BillingResult.newBuilder()
+                    callback.accept(BillingResult.newBuilder()
                             .setResponseCode(BillingClient.BillingResponseCode.ITEM_UNAVAILABLE)
                             .build());
                     return;
@@ -105,7 +121,7 @@ class GoogleBillingClientWrapper implements PurchasesUpdatedListener {
         });
     }
 
-    private void buyInAppProductInternal(@NonNull Activity activity, @NonNull ProductDetails productDetails, @NonNull PurchaseOptions options, @NonNull BillingResultListener callback) {
+    private void buyInAppProductInternal(@NonNull Activity activity, @NonNull ProductDetails productDetails, @NonNull PurchaseOptions options, @NonNull Consumer<BillingResult> callback) {
         List<BillingFlowParams.ProductDetailsParams> productDetailsParams = new ArrayList<>();
         productDetailsParams.add(BillingFlowParams.ProductDetailsParams.newBuilder()
                 .setProductDetails(productDetails)
@@ -127,10 +143,10 @@ class GoogleBillingClientWrapper implements PurchasesUpdatedListener {
         launchBillingFlow(activity, billingFlowParamsBuilder.build(), callback);
     }
 
-    public void buySubsProducts(@NonNull Activity activity, @NonNull String productId, @NonNull PurchaseOptions options, @NonNull BillingResultListener callback) {
+    public void buySubsProducts(@NonNull Activity activity, @NonNull String productId, @NonNull PurchaseOptions options, @NonNull Consumer<BillingResult> callback) {
         ensureConnection(result -> {
             if (result.getResponseCode() != BillingClient.BillingResponseCode.OK) {
-                callback.invoke(result);
+                callback.accept(result);
                 return;
             }
 
@@ -138,13 +154,13 @@ class GoogleBillingClientWrapper implements PurchasesUpdatedListener {
             productIds.add(productId);
             queryProductDetailsInternal(productIds, BillingClient.ProductType.SUBS, (queryBillingResult, queryProductDetailsResult) -> {
                 if (queryBillingResult.getResponseCode() != BillingClient.BillingResponseCode.OK) {
-                    callback.invoke(queryBillingResult);
+                    callback.accept(queryBillingResult);
                     return;
                 }
 
                 List<ProductDetails> productDetailsList = queryProductDetailsResult.getProductDetailsList();
                 if (productDetailsList.isEmpty()) {
-                    callback.invoke(BillingResult.newBuilder()
+                    callback.accept(BillingResult.newBuilder()
                             .setResponseCode(BillingClient.BillingResponseCode.ITEM_UNAVAILABLE)
                             .build());
                     return;
@@ -155,10 +171,10 @@ class GoogleBillingClientWrapper implements PurchasesUpdatedListener {
         });
     }
 
-    private void buySubsProductInternal(@NonNull Activity activity, @NonNull ProductDetails productDetails, @NonNull PurchaseOptions options, @NonNull BillingResultListener callback) {
+    private void buySubsProductInternal(@NonNull Activity activity, @NonNull ProductDetails productDetails, @NonNull PurchaseOptions options, @NonNull Consumer<BillingResult> callback) {
         List<ProductDetails.SubscriptionOfferDetails> subscriptionOfferDetails = productDetails.getSubscriptionOfferDetails();
         if (subscriptionOfferDetails == null || subscriptionOfferDetails.isEmpty()) {
-            callback.invoke(BillingResult.newBuilder()
+            callback.accept(BillingResult.newBuilder()
                     .setResponseCode(BillingClient.BillingResponseCode.ITEM_UNAVAILABLE)
                     .build());
             return;
@@ -186,10 +202,10 @@ class GoogleBillingClientWrapper implements PurchasesUpdatedListener {
         launchBillingFlow(activity, billingFlowParamsBuilder.build(), callback);
     }
 
-    public void upgradeSubsProduct(@NonNull Activity activity, @NonNull String productId, @NonNull String oldPurchaseToken, int subscriptionReplacementMode, @NonNull PurchaseOptions options, @NonNull BillingResultListener callback) {
+    public void upgradeSubsProduct(@NonNull Activity activity, @NonNull String productId, @NonNull String oldPurchaseToken, int subscriptionReplacementMode, @NonNull PurchaseOptions options, @NonNull Consumer<BillingResult> callback) {
         ensureConnection(result -> {
             if (result.getResponseCode() != BillingClient.BillingResponseCode.OK) {
-                callback.invoke(result);
+                callback.accept(result);
                 return;
             }
 
@@ -197,13 +213,13 @@ class GoogleBillingClientWrapper implements PurchasesUpdatedListener {
             productIds.add(productId);
             queryProductDetailsInternal(productIds, BillingClient.ProductType.SUBS, (queryBillingResult, queryProductDetailsResult) -> {
                 if (queryBillingResult.getResponseCode() != BillingClient.BillingResponseCode.OK) {
-                    callback.invoke(queryBillingResult);
+                    callback.accept(queryBillingResult);
                     return;
                 }
 
                 List<ProductDetails> productDetailsList = queryProductDetailsResult.getProductDetailsList();
                 if (productDetailsList.isEmpty()) {
-                    callback.invoke(BillingResult.newBuilder()
+                    callback.accept(BillingResult.newBuilder()
                             .setResponseCode(BillingClient.BillingResponseCode.ITEM_UNAVAILABLE)
                             .build());
                     return;
@@ -214,10 +230,10 @@ class GoogleBillingClientWrapper implements PurchasesUpdatedListener {
         });
     }
 
-    private void upgradeSubsProductInternal(@NonNull Activity activity, @NonNull ProductDetails productDetails, @NonNull String oldPurchaseToken, int subscriptionReplacementMode, @NonNull PurchaseOptions options, @NonNull BillingResultListener callback) {
+    private void upgradeSubsProductInternal(@NonNull Activity activity, @NonNull ProductDetails productDetails, @NonNull String oldPurchaseToken, int subscriptionReplacementMode, @NonNull PurchaseOptions options, @NonNull Consumer<BillingResult> callback) {
         List<ProductDetails.SubscriptionOfferDetails> subscriptionOfferDetails = productDetails.getSubscriptionOfferDetails();
         if (subscriptionOfferDetails == null || subscriptionOfferDetails.isEmpty()) {
-            callback.invoke(BillingResult.newBuilder()
+            callback.accept(BillingResult.newBuilder()
                     .setResponseCode(BillingClient.BillingResponseCode.ITEM_UNAVAILABLE)
                     .build());
             return;
@@ -294,10 +310,10 @@ class GoogleBillingClientWrapper implements PurchasesUpdatedListener {
         }));
     }
 
-    private void launchBillingFlow(@NonNull Activity activity, @NonNull BillingFlowParams params, @NonNull BillingResultListener callback) {
+    private void launchBillingFlow(@NonNull Activity activity, @NonNull BillingFlowParams params, @NonNull Consumer<BillingResult> callback) {
         Helper.getUiHandler().post(() -> {
             BillingResult result = billingClient.launchBillingFlow(activity, params);
-            callback.invoke(result);
+            callback.accept(result);
         });
     }
 
@@ -317,9 +333,9 @@ class GoogleBillingClientWrapper implements PurchasesUpdatedListener {
         billingClient.queryProductDetailsAsync(params, callback);
     }
 
-    private void ensureConnection(@NonNull ConnectionListener callback) {
+    private void ensureConnection(@NonNull Consumer<BillingResult> callback) {
         if (connected) {
-            callback.invoke(BillingResult.newBuilder()
+            callback.accept(BillingResult.newBuilder()
                     .setResponseCode(BillingClient.BillingResponseCode.OK)
                     .build());
             return;
@@ -331,24 +347,7 @@ class GoogleBillingClientWrapper implements PurchasesUpdatedListener {
         }
 
         connecting = true;
-        billingClient.startConnection(new BillingClientStateListener() {
-            @Override
-            public void onBillingServiceDisconnected() {
-                Helper.getBackgroundHandler().post(() -> connected = false);
-            }
-
-            @Override
-            public void onBillingSetupFinished(@NonNull BillingResult billingResult) {
-                Helper.getBackgroundHandler().post(() -> {
-                    connecting = false;
-                    connected = billingResult.getResponseCode() == BillingClient.BillingResponseCode.OK;
-                    for (ConnectionListener listener : connectionListeners) {
-                        listener.invoke(billingResult);
-                    }
-                    connectionListeners.clear();
-                });
-            }
-        });
+        billingClient.startConnection(clientStateListener);
     }
 
     @Override

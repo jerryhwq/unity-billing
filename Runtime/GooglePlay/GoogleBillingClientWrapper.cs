@@ -156,13 +156,13 @@ namespace Enbug.Billing.GooglePlay
             private readonly Action<GoogleBillingResult> _callback;
 
             public BillingResultListener(Action<GoogleBillingResult> callback) : base(
-                "io.enbug.billing.google.BillingResultListener")
+                "androidx.core.util.Consumer")
             {
                 _callback = callback;
             }
 
             [Preserve]
-            public void invoke(AndroidJavaObject nativeBillingResult)
+            public void accept(AndroidJavaObject nativeBillingResult)
             {
                 var billingResult = new GoogleBillingResult(nativeBillingResult);
                 _callback.Invoke(billingResult);

@@ -24,6 +24,10 @@ namespace Enbug.Billing.GooglePlay
         {
             return $"BillingResult{{ResponseCode={ResponseCode}, DebugMessage={DebugMessage}}}";
         }
+#else
+        private GoogleBillingResult()
+        {
+        }
 #endif
     }
 }

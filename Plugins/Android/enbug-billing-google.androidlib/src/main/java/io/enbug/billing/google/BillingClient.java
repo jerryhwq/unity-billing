@@ -4,6 +4,7 @@ import android.app.Activity;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.util.Consumer;
 
 import com.android.billingclient.api.AcknowledgePurchaseResponseListener;
 import com.android.billingclient.api.BillingResult;
@@ -44,19 +45,19 @@ public class BillingClient implements PurchasesUpdatedListener {
         });
     }
 
-    public void buyInAppProduct(@NonNull Activity activity, @NonNull String productId, @NonNull PurchaseOptions options, @NonNull BillingResultListener callback) {
+    public void buyInAppProduct(@NonNull Activity activity, @NonNull String productId, @NonNull PurchaseOptions options, @NonNull Consumer<BillingResult> callback) {
         Helper.getBackgroundHandler().post(() -> {
             billingClientWrapper.buyInAppProducts(activity, productId, options, callback);
         });
     }
 
-    public void buySubsProduct(@NonNull Activity activity, @NonNull String productId, @NonNull PurchaseOptions options, @NonNull BillingResultListener callback) {
+    public void buySubsProduct(@NonNull Activity activity, @NonNull String productId, @NonNull PurchaseOptions options, @NonNull Consumer<BillingResult> callback) {
         Helper.getBackgroundHandler().post(() -> {
             billingClientWrapper.buySubsProducts(activity, productId, options, callback);
         });
     }
 
-    public void upgradeSubsProduct(@NonNull Activity activity, @NonNull String productId, @NonNull String oldPurchaseToken, int subscriptionReplacementMode, @NonNull PurchaseOptions options, BillingResultListener callback) {
+    public void upgradeSubsProduct(@NonNull Activity activity, @NonNull String productId, @NonNull String oldPurchaseToken, int subscriptionReplacementMode, @NonNull PurchaseOptions options, @NonNull Consumer<BillingResult> callback) {
         Helper.getBackgroundHandler().post(() -> {
             billingClientWrapper.upgradeSubsProduct(activity, productId, oldPurchaseToken, subscriptionReplacementMode, options, callback);
         });

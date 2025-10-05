@@ -2,8 +2,8 @@
 
 -keeppackagenames io.enbug.billing.google.**
 
--keep interface io.enbug.billing.google.BillingResultListener {
-    void invoke(com.android.billingclient.api.BillingResult);
+-keep interface androidx.core.util.Consumer {
+    void accept(...);
 }
 
 -keep class io.enbug.billing.google.PurchaseOptions {
@@ -21,9 +21,9 @@
     public boolean isProductDetailsSupported();
     public void queryPurchases(java.lang.String, com.android.billingclient.api.PurchasesResponseListener);
     public void queryProductDetails(java.lang.String, java.util.List, com.android.billingclient.api.ProductDetailsResponseListener);
-    public void buyInAppProduct(android.app.Activity, java.lang.String, io.enbug.billing.google.PurchaseOptions, io.enbug.billing.google.BillingResultListener);
-    public void buySubsProduct(android.app.Activity, java.lang.String, io.enbug.billing.google.PurchaseOptions, io.enbug.billing.google.BillingResultListener);
-    public void upgradeSubsProduct(android.app.Activity, java.lang.String, java.lang.String, int, io.enbug.billing.google.PurchaseOptions, io.enbug.billing.google.BillingResultListener);
+    public void buyInAppProduct(android.app.Activity, java.lang.String, io.enbug.billing.google.PurchaseOptions, androidx.core.util.Consumer);
+    public void buySubsProduct(android.app.Activity, java.lang.String, io.enbug.billing.google.PurchaseOptions, androidx.core.util.Consumer);
+    public void upgradeSubsProduct(android.app.Activity, java.lang.String, java.lang.String, int, io.enbug.billing.google.PurchaseOptions, androidx.core.util.Consumer);
     public void consume(java.lang.String, com.android.billingclient.api.ConsumeResponseListener);
     public void acknowledge(java.lang.String, com.android.billingclient.api.AcknowledgePurchaseResponseListener);
     public void endConnection();

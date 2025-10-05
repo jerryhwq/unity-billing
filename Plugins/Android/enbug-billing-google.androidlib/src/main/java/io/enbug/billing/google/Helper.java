@@ -10,8 +10,11 @@ import androidx.annotation.NonNull;
 import java.lang.ref.WeakReference;
 
 class Helper {
+    @NonNull
     private static final HandlerThread backgroundThread;
+    @NonNull
     private static final Handler backgroundHandler;
+    @NonNull
     private static final Handler uiHandler;
 
     private static boolean initialized;
