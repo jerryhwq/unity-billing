@@ -22,7 +22,7 @@ namespace Enbug.Billing
 
         public BillingManager(Action<BillingResult, Purchase> onPurchaseComplete)
         {
-            var platformInfo = Resources.Load<PlatformInfo>("billing_config");
+            var platformInfo = Resources.Load<PlatformInfo>("enbug_billing");
             AppStore = platformInfo.appStore;
 
             if (Application.isEditor)
