@@ -19,6 +19,7 @@
     "url": "https://www.huwenqiang.cn/"
   },
   "dependencies": {
-    "com.unity.nuget.newtonsoft-json": "3.2.1"
+    "com.unity.nuget.newtonsoft-json": "3.2.1",
+    "com.google.external-dependency-manager": "1.2.186"
   }
 }

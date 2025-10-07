@@ -1,5 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.IO;
+using Google.JarResolver;
+using GooglePlayServices;
 using UnityEditor;
 using UnityEngine;
 
@@ -11,6 +13,7 @@ namespace Enbug.Billing.Editor
         private class LibraryInfo
         {
             public string[] PluginPaths;
+            public Dependency[] Dependencies;
         }
 
         private const string ConfigPath = "Assets/Resources/enbug_billing.asset";
@@ -42,7 +45,11 @@ namespace Enbug.Billing.Editor
         {
             [AppStore.GooglePlay] = new LibraryInfo
             {
-                PluginPaths = new[] { "enbug-billing-google.androidlib" },
+                PluginPaths = new[] { "enbug-billing-google.aar" },
+                Dependencies = new []
+                {
+                    new Dependency("com.android.billingclient", "billing", "8.0.0"),
+                },
             },
         };
 
@@ -85,6 +92,16 @@ namespace Enbug.Billing.Editor
                         var importer = (AssetImporter.GetAtPath(aarFullPath) as PluginImporter)!;
                         importer.SetCompatibleWithPlatform(BuildTarget.Android, enabled);
                         importer.SaveAndReimport();
+                    }
+
+                    if (enabled)
+                    {
+                        var pss = PlayServicesSupport.CreateInstance("EnbugBilling",
+                            EditorPrefs.GetString("AndroidSdkRoot"), "ProjectSettings");
+                        foreach (var dependency in libraryInfo.Dependencies)
+                        {
+                            pss.DependOn(dependency.Group, dependency.Artifact, dependency.Version);
+                        }
                     }
                 }
             }
