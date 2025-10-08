@@ -5,6 +5,7 @@
 using System;
 using System.Collections.Generic;
 #if ENABLE_GOOGLE_PLAY_BILLING
+using System.Collections.Concurrent;
 using UnityEngine;
 using UnityEngine.Scripting;
 #endif
@@ -15,6 +16,8 @@ namespace Enbug.Billing.GooglePlay
     {
 #if ENABLE_GOOGLE_PLAY_BILLING
         private readonly AndroidJavaObject _nativeBillingClient;
+        private readonly PurchasesUpdatedListener _purchasesUpdatedListener;
+        private readonly ConcurrentDictionary<AndroidJavaProxy, bool> _proxies = new();
 #endif
 
 #if ENABLE_GOOGLE_PLAY_BILLING
@@ -38,8 +41,9 @@ namespace Enbug.Billing.GooglePlay
         public GoogleBillingClientWrapper(Action<GoogleBillingResult, List<GooglePurchase>> onPurchasesUpdated)
         {
 #if ENABLE_GOOGLE_PLAY_BILLING
-            _nativeBillingClient = new AndroidJavaObject("io.enbug.billing.google.BillingClient",
-                new PurchasesUpdatedListener(onPurchasesUpdated));
+            _purchasesUpdatedListener = new PurchasesUpdatedListener(onPurchasesUpdated);
+            _nativeBillingClient =
+                new AndroidJavaObject("io.enbug.billing.google.BillingClient", _purchasesUpdatedListener);
 #endif
         }
 
@@ -60,7 +64,7 @@ namespace Enbug.Billing.GooglePlay
             foreach (var productId in productIds)
                 javaProductList.Call<bool>("add", productId);
 
-            var listener = new ProductDetailsResponseListener(callback);
+            var listener = new ProductDetailsResponseListener(_proxies, callback);
             _nativeBillingClient.Call("queryProductDetails", productType, javaProductList, listener);
 #endif
         }
@@ -82,7 +86,7 @@ namespace Enbug.Billing.GooglePlay
             using var unityActivity = unityClass.GetStatic<AndroidJavaObject>("currentActivity");
             using var javaOptions = ConvertOptions(options);
             _nativeBillingClient.Call("buyInAppProduct", unityActivity, productId, javaOptions,
-                new BillingResultListener(callback));
+                new BillingResultListener(_proxies, callback));
 #endif
         }
 
@@ -93,14 +97,14 @@ namespace Enbug.Billing.GooglePlay
             using var unityActivity = unityClass.GetStatic<AndroidJavaObject>("currentActivity");
             using var javaOptions = ConvertOptions(options);
             _nativeBillingClient.Call("buySubsProduct", unityActivity, productId, javaOptions,
-                new BillingResultListener(callback));
+                new BillingResultListener(_proxies, callback));
 #endif
         }
 
         public void Consume(string purchaseToken, Action<GoogleBillingResult, string> callback)
         {
 #if ENABLE_GOOGLE_PLAY_BILLING
-            var consumeResponseListener = new ConsumeResponseListener(callback);
+            var consumeResponseListener = new ConsumeResponseListener(_proxies, callback);
             _nativeBillingClient.Call("consume", purchaseToken, consumeResponseListener);
 #endif
         }
@@ -108,7 +112,7 @@ namespace Enbug.Billing.GooglePlay
         public void Acknowledge(string purchaseToken, Action<GoogleBillingResult> callback)
         {
 #if ENABLE_GOOGLE_PLAY_BILLING
-            var acknowledgeResponseListener = new AcknowledgePurchaseResponseListener(callback);
+            var acknowledgeResponseListener = new AcknowledgePurchaseResponseListener(_proxies, callback);
             _nativeBillingClient.Call("acknowledge", purchaseToken, acknowledgeResponseListener);
 #endif
         }
@@ -116,7 +120,7 @@ namespace Enbug.Billing.GooglePlay
         public void QueryPurchases(string productType, Action<GoogleBillingResult, List<GooglePurchase>> callback)
         {
 #if ENABLE_GOOGLE_PLAY_BILLING
-            var purchasesResponseListener = new PurchasesResponseListener(callback);
+            var purchasesResponseListener = new PurchasesResponseListener(_proxies, callback);
             _nativeBillingClient.Call("queryPurchases", productType, purchasesResponseListener);
 #endif
         }
@@ -153,17 +157,24 @@ namespace Enbug.Billing.GooglePlay
 #if ENABLE_GOOGLE_PLAY_BILLING
         private class BillingResultListener : AndroidJavaProxy
         {
+            private readonly ConcurrentDictionary<AndroidJavaProxy, bool> _proxies;
             private readonly Action<GoogleBillingResult> _callback;
 
-            public BillingResultListener(Action<GoogleBillingResult> callback) : base(
-                "androidx.core.util.Consumer")
+            public BillingResultListener(
+                ConcurrentDictionary<AndroidJavaProxy, bool> proxies,
+                Action<GoogleBillingResult> callback
+            ) : base("androidx.core.util.Consumer")
             {
+                _proxies = proxies;
                 _callback = callback;
+                _proxies[this] = true;
             }
 
             [Preserve]
             public void accept(AndroidJavaObject nativeBillingResult)
             {
+                _proxies.TryRemove(this, out _);
+
                 var billingResult = new GoogleBillingResult(nativeBillingResult);
                 _callback.Invoke(billingResult);
             }
@@ -171,17 +182,24 @@ namespace Enbug.Billing.GooglePlay
 
         private class AcknowledgePurchaseResponseListener : AndroidJavaProxy
         {
+            private readonly ConcurrentDictionary<AndroidJavaProxy, bool> _proxies;
             private readonly Action<GoogleBillingResult> _callback;
 
-            public AcknowledgePurchaseResponseListener(Action<GoogleBillingResult> callback) : base(
-                "com.android.billingclient.api.AcknowledgePurchaseResponseListener")
+            public AcknowledgePurchaseResponseListener(
+                ConcurrentDictionary<AndroidJavaProxy, bool> proxies,
+                Action<GoogleBillingResult> callback
+            ) : base("com.android.billingclient.api.AcknowledgePurchaseResponseListener")
             {
+                _proxies = proxies;
                 _callback = callback;
+                _proxies[this] = true;
             }
 
             [Preserve]
             public void onAcknowledgePurchaseResponse(AndroidJavaObject nativeBillingResult)
             {
+                _proxies.TryRemove(this, out _);
+
                 var billingResult = new GoogleBillingResult(nativeBillingResult);
                 _callback.Invoke(billingResult);
             }
@@ -189,17 +207,24 @@ namespace Enbug.Billing.GooglePlay
 
         private class SkuDetailsResponseListener : AndroidJavaProxy
         {
+            private readonly ConcurrentDictionary<AndroidJavaProxy, bool> _proxies;
             private readonly Action<GoogleBillingResult, List<GoogleSkuDetails>> _callback;
 
-            public SkuDetailsResponseListener(Action<GoogleBillingResult, List<GoogleSkuDetails>> callback) :
-                base("com.android.billingclient.api.SkuDetailsResponseListener")
+            public SkuDetailsResponseListener(
+                ConcurrentDictionary<AndroidJavaProxy, bool> proxies,
+                Action<GoogleBillingResult, List<GoogleSkuDetails>> callback
+            ) : base("com.android.billingclient.api.SkuDetailsResponseListener")
             {
+                _proxies = proxies;
                 _callback = callback;
+                _proxies[this] = true;
             }
 
             [Preserve]
             public void onSkuDetailsResponse(AndroidJavaObject nativeBillingResult, AndroidJavaObject nativeSkuDetails)
             {
+                _proxies.TryRemove(this, out _);
+
                 var billingResult = new GoogleBillingResult(nativeBillingResult);
 
                 List<GoogleSkuDetails> skuDetails = null;
@@ -221,18 +246,25 @@ namespace Enbug.Billing.GooglePlay
 
         private class ProductDetailsResponseListener : AndroidJavaProxy
         {
+            private readonly ConcurrentDictionary<AndroidJavaProxy, bool> _proxies;
             private readonly Action<GoogleBillingResult, List<GoogleProductDetails>> _callback;
 
-            public ProductDetailsResponseListener(Action<GoogleBillingResult, List<GoogleProductDetails>> callback) :
-                base("com.android.billingclient.api.ProductDetailsResponseListener")
+            public ProductDetailsResponseListener(
+                ConcurrentDictionary<AndroidJavaProxy, bool> proxies,
+                Action<GoogleBillingResult, List<GoogleProductDetails>> callback
+            ) : base("com.android.billingclient.api.ProductDetailsResponseListener")
             {
+                _proxies = proxies;
                 _callback = callback;
+                _proxies[this] = true;
             }
 
             [Preserve]
             public void onProductDetailsResponse(AndroidJavaObject nativeBillingResult,
                 AndroidJavaObject nativeProductDetails)
             {
+                _proxies.TryRemove(this, out _);
+
                 var billingResult = new GoogleBillingResult(nativeBillingResult);
                 List<GoogleProductDetails> productDetails = null;
                 if (nativeProductDetails != null)
@@ -253,17 +285,24 @@ namespace Enbug.Billing.GooglePlay
 
         private class ConsumeResponseListener : AndroidJavaProxy
         {
+            private readonly ConcurrentDictionary<AndroidJavaProxy, bool> _proxies;
             private readonly Action<GoogleBillingResult, string> _callback;
 
-            public ConsumeResponseListener(Action<GoogleBillingResult, string> callback) : base(
-                "com.android.billingclient.api.ConsumeResponseListener")
+            public ConsumeResponseListener(
+                ConcurrentDictionary<AndroidJavaProxy, bool> proxies,
+                Action<GoogleBillingResult, string> callback
+            ) : base("com.android.billingclient.api.ConsumeResponseListener")
             {
+                _proxies = proxies;
                 _callback = callback;
+                _proxies[this] = true;
             }
 
             [Preserve]
             public void onConsumeResponse(AndroidJavaObject nativeBillingResult, string purchaseToken)
             {
+                _proxies.TryRemove(this, out _);
+
                 var billingResult = new GoogleBillingResult(nativeBillingResult);
                 _callback.Invoke(billingResult, purchaseToken);
             }
@@ -271,18 +310,25 @@ namespace Enbug.Billing.GooglePlay
 
         private class PurchasesResponseListener : AndroidJavaProxy
         {
+            private readonly ConcurrentDictionary<AndroidJavaProxy, bool> _proxies;
             private readonly Action<GoogleBillingResult, List<GooglePurchase>> _callback;
 
-            public PurchasesResponseListener(Action<GoogleBillingResult, List<GooglePurchase>> callback) : base(
-                "com.android.billingclient.api.PurchasesResponseListener")
+            public PurchasesResponseListener(
+                ConcurrentDictionary<AndroidJavaProxy, bool> proxies,
+                Action<GoogleBillingResult, List<GooglePurchase>> callback
+            ) : base("com.android.billingclient.api.PurchasesResponseListener")
             {
+                _proxies = proxies;
                 _callback = callback;
+                _proxies[this] = true;
             }
 
             [Preserve]
             public void onQueryPurchasesResponse(AndroidJavaObject nativeBillingResult,
                 AndroidJavaObject nativePurchases)
             {
+                _proxies.TryRemove(this, out _);
+
                 var billingResult = new GoogleBillingResult(nativeBillingResult);
                 var purchases = new List<GooglePurchase>();
                 if (nativePurchases != null)
