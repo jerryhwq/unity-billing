@@ -1,4 +1,4 @@
-#if UNITY_ANDROID && !UNITY_EDITOR && ENABLE_UNITY_ANDROID_JNI
+#if UNITY_ANDROID && ENABLE_UNITY_ANDROID_JNI
 #define ENABLE_GOOGLE_PLAY_BILLING
 #endif
 
@@ -55,7 +55,7 @@ namespace Enbug.Billing.GooglePlay
         }
 
         public void QueryProductDetails(string productType, string[] productIds,
-            Action<GoogleBillingResult, List<GoogleProductDetails>> callback)
+            Action<GoogleBillingResult, GoogleQueryProductDetailsResult> callback)
         {
 #if ENABLE_GOOGLE_PLAY_BILLING
             using var unityClass = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
@@ -247,11 +247,11 @@ namespace Enbug.Billing.GooglePlay
         private class ProductDetailsResponseListener : AndroidJavaProxy
         {
             private readonly ConcurrentDictionary<AndroidJavaProxy, bool> _proxies;
-            private readonly Action<GoogleBillingResult, List<GoogleProductDetails>> _callback;
+            private readonly Action<GoogleBillingResult, GoogleQueryProductDetailsResult> _callback;
 
             public ProductDetailsResponseListener(
                 ConcurrentDictionary<AndroidJavaProxy, bool> proxies,
-                Action<GoogleBillingResult, List<GoogleProductDetails>> callback
+                Action<GoogleBillingResult, GoogleQueryProductDetailsResult> callback
             ) : base("com.android.billingclient.api.ProductDetailsResponseListener")
             {
                 _proxies = proxies;
@@ -261,25 +261,13 @@ namespace Enbug.Billing.GooglePlay
 
             [Preserve]
             public void onProductDetailsResponse(AndroidJavaObject nativeBillingResult,
-                AndroidJavaObject nativeProductDetails)
+                AndroidJavaObject nativeQueryProductDetailsResult)
             {
                 _proxies.TryRemove(this, out _);
 
                 var billingResult = new GoogleBillingResult(nativeBillingResult);
-                List<GoogleProductDetails> productDetails = null;
-                if (nativeProductDetails != null)
-                {
-                    productDetails = new List<GoogleProductDetails>();
-                    var size = nativeProductDetails.Call<int>("size");
-                    for (var i = 0; i < size; i++)
-                    {
-                        using var javaProductDetails = nativeProductDetails.Call<AndroidJavaObject>("get", i);
-                        var productDetail = new GoogleProductDetails(javaProductDetails);
-                        productDetails.Add(productDetail);
-                    }
-                }
-
-                _callback.Invoke(billingResult, productDetails);
+                var queryProductDetailsResult = new GoogleQueryProductDetailsResult(nativeQueryProductDetailsResult);
+                _callback.Invoke(billingResult, queryProductDetailsResult);
             }
         }
 

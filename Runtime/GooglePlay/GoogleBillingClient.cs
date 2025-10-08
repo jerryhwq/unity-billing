@@ -22,17 +22,17 @@ namespace Enbug.Billing.GooglePlay
         public void QueryInAppProducts(string[] productIds, Action<BillingResult, List<Product>> callback)
         {
             _billingClientWrapper.QueryProductDetails(GoogleProductType.INAPP, productIds,
-                (billingResult, googleProductDetailsList) =>
+                (billingResult, googleQueryProductDetailsResult) =>
                 {
                     var result = ConvertBillingResult(billingResult);
                     if (result.ResponseCode != BillingResult.OK ||
-                        googleProductDetailsList == null)
+                        googleQueryProductDetailsResult == null)
                     {
                         callback.Invoke(result, null);
                         return;
                     }
 
-                    var products = googleProductDetailsList
+                    var products = googleQueryProductDetailsResult.ProductDetailsList
                         .Select(googleProductDetails => new Product
                         {
                             DisplayPrice = googleProductDetails.OneTimePurchaseOfferDetails?.FormattedPrice,
@@ -52,17 +52,17 @@ namespace Enbug.Billing.GooglePlay
         public void QuerySubsProducts(string[] productIds, Action<BillingResult, List<Product>> callback)
         {
             _billingClientWrapper.QueryProductDetails(GoogleProductType.SUBS, productIds,
-                (billingResult, googleProductDetailsList) =>
+                (billingResult, googleQueryProductDetailsResult) =>
                 {
                     var result = ConvertBillingResult(billingResult);
                     if (result.ResponseCode != BillingResult.OK ||
-                        googleProductDetailsList == null)
+                        googleQueryProductDetailsResult == null)
                     {
                         callback.Invoke(result, null);
                         return;
                     }
 
-                    var products = googleProductDetailsList
+                    var products = googleQueryProductDetailsResult.ProductDetailsList
                         .Select(googleProductDetails =>
                         {
                             var product = new Product
