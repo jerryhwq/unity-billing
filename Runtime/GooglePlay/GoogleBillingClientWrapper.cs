@@ -43,7 +43,7 @@ namespace Enbug.Billing.GooglePlay
 #if ENABLE_GOOGLE_PLAY_BILLING
             _purchasesUpdatedListener = new PurchasesUpdatedListener(onPurchasesUpdated);
             _nativeBillingClient =
-                new AndroidJavaObject("io.enbug.billing.google.BillingClient", _purchasesUpdatedListener);
+                new AndroidJavaObject("io.enbug.billing.google.GoogleBillingClientWrapper", _purchasesUpdatedListener);
 #endif
         }
 
