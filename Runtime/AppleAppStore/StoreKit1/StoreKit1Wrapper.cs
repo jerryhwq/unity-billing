@@ -10,9 +10,9 @@ using UnityEngine;
 
 namespace Enbug.Billing.AppleAppStore.StoreKit1
 {
-    public static class StoreKit1Wrapper
+    internal static class StoreKit1Wrapper
     {
-#if UNITY_IOS && !UNITY_EDITOR
+#if USE_APPLE_STOREKIT
         private const string LibName = "__Internal";
 #endif
         public static event Action<SKPaymentTransaction[]> TransactionUpdatedCallback;

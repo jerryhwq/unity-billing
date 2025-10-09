@@ -10,7 +10,7 @@ using UnityEngine;
 
 namespace Enbug.Billing.AppleAppStore.StoreKit2
 {
-    public static class StoreKit2Wrapper
+    internal static class StoreKit2Wrapper
     {
 #if USE_APPLE_STOREKIT
         private const string LibName = "__Internal";
