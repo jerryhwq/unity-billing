@@ -372,7 +372,6 @@ private func convert(product: Product) async -> [String: Any] {
 }
 
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, visionOS 1.0, *)
-@MainActor
 private func purchase(_ productIdentifier: String, appAccountToken: UUID? = nil) async -> PaymentResult {
     if !AppStore.canMakePayments {
         return .code(.paymentNotAllowed)
@@ -432,7 +431,7 @@ func setTransactionUpdatedCallback(callback: @Sendable @convention(c) (UnsafePoi
 func mainLoop() {
     if initialized { return }
     initialized = true
-    Task.detached {
+    Task { @MainActor in
         for await verificationResult in Transaction.updates {
             switch verificationResult {
             case .verified(let transaction):
@@ -441,10 +440,8 @@ func mainLoop() {
                 do {
                     let jsonData = try JSONSerialization.data(withJSONObject: transactionDict)
                     let jsonStr = String(data: jsonData, encoding: .utf8)!
-                    await MainActor.run {
-                        jsonStr.withCString { cString in
-                            transactionUpudated?(cString)
-                        }
+                    jsonStr.withCString { cString in
+                        transactionUpudated?(cString)
                     }
                 } catch {
                     print("[Enbug][Billing] error:\(error)")
@@ -463,7 +460,7 @@ func storeKit2RequestProducts(requestId: Int32, productIdentifiers: UnsafePointe
         let productIdentifierStr = String(cString: productIdentifiers)
         let productIdentifierData = productIdentifierStr.data(using: .utf8)!
         let productIdentifierArr = try JSONSerialization.jsonObject(with: productIdentifierData) as! [String]
-        Task.detached {
+        Task { @MainActor in
             let products = try await Product.products(for: Set(productIdentifierArr))
 
             var productList: [[String: Any]] = []
@@ -474,10 +471,8 @@ func storeKit2RequestProducts(requestId: Int32, productIdentifiers: UnsafePointe
             do {
                 let jsonData = try JSONSerialization.data(withJSONObject: productList)
                 let jsonStr = String(data: jsonData, encoding: .utf8)!
-                await MainActor.run {
-                    jsonStr.withCString { cString in
-                        callback(requestId, cString)
-                    }
+                jsonStr.withCString { cString in
+                    callback(requestId, cString)
                 }
             } catch {
                print("[Enbug][Billing] error:\(error)")
@@ -504,7 +499,7 @@ func storeKit2Purchase(requestId: Int32, productIdentifier: UnsafePointer<CChar>
         }
     }
 
-    Task.detached {
+    Task { @MainActor in
         let result = await purchase(str, appAccountToken: appAccountToken)
         var dict: [String: Any] = [:]
         switch result {
@@ -522,10 +517,8 @@ func storeKit2Purchase(requestId: Int32, productIdentifier: UnsafePointer<CChar>
         do {
             let jsonData = try JSONSerialization.data(withJSONObject: dict)
             let jsonStr = String(data: jsonData, encoding: .utf8)!
-            await MainActor.run {
-                jsonStr.withCString { cString in
-                    callback(requestId, cString)
-                }
+            jsonStr.withCString { cString in
+                callback(requestId, cString)
             }
         } catch {
             print("[Enbug][Billing] error:\(error)")
@@ -536,25 +529,21 @@ func storeKit2Purchase(requestId: Int32, productIdentifier: UnsafePointer<CChar>
 @_cdecl("enbug_iap_storekit2_finish_transaction")
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, visionOS 1.0, *)
 func storeKit2FinishTransaction(requestId: Int32, identifier: UInt64, callback: @Sendable @convention(c) (Int32, Int32) -> Void) -> Int32 {
-    Task.detached {
+    Task { @MainActor in
         for await verificationResult in Transaction.unfinished {
             switch verificationResult {
             case .verified(let transation):
                 if transation.id == identifier {
                     await transation.finish()
-                    await MainActor.run {
-                        callback(requestId, 1)
-                    }
+                    callback(requestId, 1)
                     return
                 }
             default:
                 break
             }
         }
-        
-        await MainActor.run {
-            callback(requestId, 0)
-        }
+
+        callback(requestId, 0)
     }
 
     return 1
@@ -563,7 +552,7 @@ func storeKit2FinishTransaction(requestId: Int32, identifier: UInt64, callback: 
 @_cdecl("enbug_iap_storekit2_get_transactions")
 @available(iOS 15.0, macOS 12.0, tvOS 15.0, watchOS 8.0, visionOS 1.0, *)
 func storeKit2GetTransactions(requestId: Int32, callback: @Sendable @convention(c) (Int32, UnsafePointer<CChar>?) -> Void) {
-    Task.detached {
+    Task { @MainActor in
         var transactions: [[String: Any]] = []
         for await verificationResult in Transaction.unfinished {
             switch verificationResult {
@@ -577,10 +566,8 @@ func storeKit2GetTransactions(requestId: Int32, callback: @Sendable @convention(
         do {
             let jsonData = try JSONSerialization.data(withJSONObject: transactions)
             let jsonStr = String(data: jsonData, encoding: .utf8)!
-            await MainActor.run {
-                jsonStr.withCString { cString in
-                    callback(requestId, cString)
-                }
+            jsonStr.withCString { cString in
+                callback(requestId, cString)
             }
         } catch {
             print("[Enbug][Billing] error:\(error)")
